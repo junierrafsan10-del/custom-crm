@@ -68,10 +68,6 @@ export default function App() {
       setAuthLoading(true);
       navigate('/settings');
       post('/api/auth/meta-callback', { code })
-      .then(res => {
-        if (!res.ok) throw new Error('Authorization response error');
-        return res.json();
-      })
       .then(resData => {
         if (resData.success) {
           setMetaConnections(resData.data);

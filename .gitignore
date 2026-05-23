@@ -6,3 +6,5 @@ node_modules/
 .node/
 dist/
 *.log
+api_output.json
+*.swp

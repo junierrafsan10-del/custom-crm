@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { get, post, put, del } from '../utils/api';
 import { 
   Plus, 
   Search, 
@@ -8,20 +9,26 @@ import {
   HelpCircle,
   User,
   Calendar,
-  ChevronDown
+  ChevronDown,
+  Trash2
 } from 'lucide-react';
 
 export default function Tasks() {
-  const [tasks, setTasks] = useState([
-    { id: 1, title: 'Call back Tasnim Rahman', desc: 'Wants to discuss pricing plans for wholesale packages.', priority: 'High', status: 'Open', dueDate: '2026-05-21', assignee: 'Support Member A' },
-    { id: 2, title: 'Reply to Zunayed WhatsApp message', desc: 'Reply with the standard onboarding details document.', priority: 'Medium', status: 'In Progress', dueDate: '2026-05-20', assignee: 'Support Member B' },
-    { id: 3, title: 'Verify Facebook integrations Webhook', desc: 'Webhook seems to drop connection under peak payloads.', priority: 'High', status: 'Blocked', dueDate: '2026-05-22', assignee: 'Admin' },
-    { id: 4, title: 'Update leads sheet for converted leads', desc: 'Need to import converted leads data to invoicing module.', priority: 'Low', status: 'Closed', dueDate: '2026-05-18', assignee: 'Support Member A' }
-  ]);
-
+  const [tasks, setTasks] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTask, setNewTask] = useState({ title: '', desc: '', priority: 'Medium', status: 'Open', dueDate: '', assignee: 'Support Member A' });
+
+  useEffect(() => {
+    get('/api/tasks')
+      .then(data => {
+        if (data.success && data.data) {
+          const mapped = data.data.map(t => ({ ...t, id: t._id }));
+          setTasks(mapped);
+        }
+      })
+      .catch(err => console.error('Error fetching tasks:', err));
+  }, []);
 
   const filteredTasks = tasks.filter(task => 
     task.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -31,16 +38,23 @@ export default function Tasks() {
   const handleAddTask = (e) => {
     e.preventDefault();
     if (!newTask.title) return;
-    
-    setTasks([
-      ...tasks,
-      {
-        id: tasks.length + 1,
-        ...newTask
-      }
-    ]);
-    setNewTask({ title: '', desc: '', priority: 'Medium', status: 'Open', dueDate: '', assignee: 'Support Member A' });
-    setShowAddModal(false);
+    post('/api/tasks', newTask)
+      .then(data => {
+        if (data.success && data.data) {
+          setTasks([{ ...data.data, id: data.data._id }, ...tasks]);
+        }
+        setNewTask({ title: '', desc: '', priority: 'Medium', status: 'Open', dueDate: '', assignee: 'Support Member A' });
+        setShowAddModal(false);
+      })
+      .catch(err => console.error('Error creating task:', err));
+  };
+
+  const handleDeleteTask = (taskId) => {
+    del('/api/tasks/' + taskId)
+      .then(() => {
+        setTasks(tasks.filter(t => t.id !== taskId));
+      })
+      .catch(err => console.error('Error deleting task:', err));
   };
 
   const getStatusStyle = (status) => {
@@ -114,9 +128,18 @@ export default function Tasks() {
                 <User size={12} className="text-indigo-400" />
                 <span>{task.assignee}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar size={12} className="text-indigo-400" />
-                <span>Due: {task.dueDate}</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <Calendar size={12} className="text-indigo-400" />
+                  <span>Due: {task.dueDate}</span>
+                </div>
+                <button 
+                  onClick={() => handleDeleteTask(task.id)}
+                  className="p-1.5 rounded bg-slate-800 hover:bg-red-950 text-slate-500 hover:text-red-400 transition-all"
+                  title="Delete task"
+                >
+                  <Trash2 size={12} />
+                </button>
               </div>
             </div>
           </div>

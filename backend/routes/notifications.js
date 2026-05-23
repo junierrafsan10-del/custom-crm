@@ -17,9 +17,9 @@ router.post('/api/notifications/mark-read', requireAuth, async (req, res) => {
   try {
     const { ids } = req.body;
     if (ids && Array.isArray(ids)) {
-      await Notification.updateMany({ _id: { $in: ids } }, { read: true });
+      await Notification.updateMany({ _id: { $in: ids } }, { unread: false });
     } else {
-      await Notification.updateMany({}, { read: true });
+      await Notification.updateMany({}, { unread: false });
     }
     res.json({ success: true, data: { message: 'Notifications marked as read' } });
   } catch (err) {

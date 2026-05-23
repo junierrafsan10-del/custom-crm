@@ -35,6 +35,7 @@ const customerRoutes = require('./routes/customers');
 const notificationRoutes = require('./routes/notifications');
 const uploadRoutes = require('./routes/upload');
 const tunnelRoutes = require('./routes/tunnel');
+const taskRoutes = require('./routes/tasks');
 
 app.use(authRoutes);
 app.use(userRoutes);
@@ -44,6 +45,7 @@ app.use(customerRoutes);
 app.use(notificationRoutes);
 app.use(uploadRoutes);
 app.use(tunnelRoutes);
+app.use(taskRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, data: { status: 'ok', uptime: process.uptime() } });
@@ -72,12 +74,9 @@ async function start() {
     await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
     console.log('Connected to MongoDB');
   } catch (err) {
-    console.log('MongoDB not available (' + err.message + '), starting in-memory MongoDB...');
-    const { MongoMemoryServer } = require('mongodb-memory-server');
-    const mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
-    await mongoose.connect(uri);
-    console.log('Connected to in-memory MongoDB at', uri);
+    console.error('Failed to connect to MongoDB:', err.message);
+    console.error('Make sure MONGODB_URI is set correctly in backend/.env');
+    process.exit(1);
   }
   await seedDefaultUsers();
   app.listen(PORT, () => {
