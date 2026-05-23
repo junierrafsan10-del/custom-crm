@@ -1,0 +1,8 @@
+.env
+backend/.env
+backend/db_store.json
+backend/uploads/
+node_modules/
+.node/
+dist/
+*.log
