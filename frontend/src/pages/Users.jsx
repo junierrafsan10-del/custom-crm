@@ -112,6 +112,24 @@ export default function Users() {
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
+  const filteredCustomers = customers.filter(c => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || 
+      (c.name && c.name.toLowerCase().includes(term)) ||
+      (c.phone && c.phone.toLowerCase().includes(term)) ||
+      (c.email && c.email.toLowerCase().includes(term));
+    const matchesPlatform = platformFilter === 'all' || 
+      (c.platform && c.platform.toLowerCase() === platformFilter);
+    return matchesSearch && matchesPlatform;
+  });
+
+  const handleOpenInChat = (customer) => {
+    if (customer.participantId) {
+      localStorage.setItem('crm_active_chat_id', customer.participantId);
+      window.location.href = '/chat';
+    }
+  };
+
   // Set edit form values when selected customer changes
   useEffect(() => {
     if (selectedCustomer) {
