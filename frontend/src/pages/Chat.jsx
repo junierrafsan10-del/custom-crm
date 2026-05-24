@@ -448,14 +448,14 @@ export default function Chat({ metaConnections, user }) {
       .catch(err => console.error('Error fetching messages:', err));
   };
 
-  // Poll every 3 seconds
+  // Poll every 15 seconds
   useEffect(() => {
     fetchMessages();
     fetchLeads();
     const interval = setInterval(() => {
       fetchMessages();
       fetchLeads();
-    }, 3000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [facebookPageId, whatsappPhone]);
 

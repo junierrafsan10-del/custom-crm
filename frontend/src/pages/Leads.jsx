@@ -1,298 +1,314 @@
 import React, { useState, useEffect } from 'react';
 import { get, post, put, del } from '../utils/api';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  UserPlus, 
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Plus,
+  Trash2,
   ArrowRight,
-  TrendingUp,
-  MessageCircle,
-  Phone,
-  Trash2
+  X,
+  Target,
+  Inbox
 } from 'lucide-react';
+
+const stages = ['Intake', 'Interested', 'Qualified', 'Converted', 'Lost'];
+
+const stageColors = {
+  Intake: 'bg-tertiary',
+  Interested: 'bg-secondary',
+  Qualified: 'bg-primary-fixed-dim',
+  Converted: 'bg-on-surface-variant',
+  Lost: 'bg-error'
+};
+
+const stageLabels = {
+  Intake: 'Discovery',
+  Interested: 'Proposal',
+  Qualified: 'Negotiation',
+  Converted: 'Closed Won',
+  Lost: 'Lost'
+};
+
+function formatValue(value) {
+  const num = parseInt(String(value || '0').replace('$', '') || 0);
+  if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
+  if (num >= 1000) return `$${(num / 1000).toFixed(0)}k`;
+  return `$${num.toLocaleString()}`;
+}
+
+function getInitials(name) {
+  if (!name) return '?';
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function EmptyColumn({ label }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-40 border border-dashed border-outline-variant/15 rounded-xl bg-surface-container-low/20">
+      <Inbox size={24} className="text-on-surface-variant/20 mb-2" />
+      <p className="text-xs text-on-surface-variant/40 font-medium">No deals</p>
+      <p className="text-[10px] text-on-surface-variant/30 mt-0.5">Drag or add a new deal</p>
+    </div>
+  );
+}
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newLead, setNewLead] = useState({ name: '', email: '', phone: '', stage: 'Intake', source: 'Facebook', value: '' });
 
-  const stages = ['Intake', 'Interested', 'Qualified', 'Converted', 'Lost'];
-
   useEffect(() => {
     get('/api/leads')
-      .then(data => {
-        if (data.success && data.data) {
-          const formatted = data.data.map(l => ({
-            ...l,
-            id: l._id || l.id
-          }));
-          setLeads(formatted);
+      .then(d => {
+        if (d.success && d.data) {
+          setLeads(d.data.map(l => ({ ...l, id: l._id || l.id })));
         }
       })
       .catch(err => console.error('Failed to fetch leads:', err));
   }, []);
 
-  const filteredLeads = leads.filter(lead => 
-    (lead.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (lead.phone || '').includes(searchTerm)
+  const filtered = leads.filter(l =>
+    (l.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (l.phone || '').includes(search)
   );
 
-  const handleAddLead = (e) => {
+  const getStageData = (stage) => {
+    const items = filtered.filter(l => l.stage === stage);
+    const total = items.reduce((acc, curr) => acc + parseInt(String(curr.value || '0').replace('$', '') || 0), 0);
+    return { items, total, count: items.length };
+  };
+
+  const handleAdd = (e) => {
     e.preventDefault();
     if (!newLead.name || !newLead.phone) return;
-    
     post('/api/leads', { ...newLead, value: newLead.value ? `$${newLead.value}` : '$0' })
-      .then(data => {
-        if (data.success && data.data) {
-          const formatted = { ...data.data, id: data.data._id || data.data.id };
-          setLeads(prev => [...prev, formatted]);
+      .then(d => {
+        if (d.success && d.data) {
+          setLeads(p => [...p, { ...d.data, id: d.data._id || d.data.id }]);
           setNewLead({ name: '', email: '', phone: '', stage: 'Intake', source: 'Facebook', value: '' });
           setShowAddModal(false);
-        } else {
-          alert('Failed to add lead: ' + (data.error || 'Unknown error'));
         }
       })
-      .catch(err => {
-        console.error('Error adding lead:', err);
-        alert('Could not reach backend to add lead.');
-      });
+      .catch(err => { console.error('Error adding lead:', err); alert('Could not reach backend.'); });
   };
 
-  const handleMoveStage = (leadId, nextStage) => {
-    put(`/api/leads/${leadId}`, { stage: nextStage })
-      .then(data => {
-        if (data.success) {
-          setLeads(prev => prev.map(lead => lead.id === leadId ? { ...lead, stage: nextStage } : lead));
-        } else {
-          alert('Failed to update stage: ' + (data.error || 'Unknown error'));
-        }
-      })
-      .catch(err => {
-        console.error('Error updating stage:', err);
-        alert('Could not update stage in backend.');
-      });
+  const handleMove = (id, next) => {
+    put(`/api/leads/${id}`, { stage: next })
+      .then(d => { if (d.success) setLeads(p => p.map(l => l.id === id ? { ...l, stage: next } : l)); })
+      .catch(err => { console.error('Error updating stage:', err); alert('Could not update stage.'); });
   };
 
-  const handleDeleteLead = (leadId) => {
-    if (!window.confirm('Are you sure you want to delete this lead?')) return;
-
-    del(`/api/leads/${leadId}`)
-      .then(data => {
-        if (data.success) {
-          setLeads(prev => prev.filter(lead => lead.id !== leadId));
-        } else {
-          alert('Failed to delete lead: ' + (data.error || 'Unknown error'));
-        }
-      })
-      .catch(err => {
-        console.error('Error deleting lead:', err);
-        alert('Could not delete lead in backend.');
-      });
+  const handleDelete = (id) => {
+    if (!window.confirm('Delete this deal?')) return;
+    del(`/api/leads/${id}`)
+      .then(d => { if (d.success) setLeads(p => p.filter(l => l.id !== id)); })
+      .catch(err => { console.error('Error deleting lead:', err); alert('Could not delete.'); });
   };
 
   return (
-    <div className="space-y-6">
-      
-      {/* Filters and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/40 p-4 rounded-xl border border-slate-800/80">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-2.5 text-slate-500" size={16} />
-          <input 
-            type="text" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search leads by name or phone..." 
-            className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-lg text-slate-300 text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
-          />
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-on-surface tracking-tight">Deals Pipeline</h1>
+          <p className="text-sm text-on-surface-variant/70 mt-1">Manage and track your sales pipeline</p>
         </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-950 border border-slate-800 text-slate-300 text-xs rounded-lg hover:bg-slate-800 transition-colors w-1/2 sm:w-auto justify-center">
-            <Filter size={14} /> Filter
-          </button>
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition-colors w-1/2 sm:w-auto justify-center shadow-lg shadow-indigo-600/10"
-          >
-            <Plus size={14} /> Add Lead
-          </button>
-        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="btn-primary"
+        >
+          <Plus size={16} />
+          Add Deal
+        </button>
       </div>
 
-      {/* Kanban Stages Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 overflow-x-auto pb-4">
-        {stages.map((stage) => {
-          const stageLeads = filteredLeads.filter(l => l.stage === stage);
-          const totalValue = stageLeads.reduce((acc, curr) => acc + parseInt(curr.value.replace('$', '') || 0), 0);
-          
+      {/* Kanban */}
+      <div className="flex overflow-x-auto kanban-scroll items-start gap-5 min-w-max pb-4" style={{ minHeight: 'calc(100vh - 200px)' }}>
+        {stages.map((stage, sIdx) => {
+          const { items, total, count } = getStageData(stage);
+          const next = sIdx < stages.length - 1 ? stages[sIdx + 1] : null;
+
           return (
-            <div key={stage} className="min-w-[240px] flex flex-col bg-slate-900/10 border border-slate-800/40 rounded-xl p-4 h-[calc(100vh-14.5rem)]">
-              {/* Stage Header */}
-              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800/60">
-                <div>
-                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wide">{stage}</h3>
-                  <span className="text-[10px] text-slate-500 mt-0.5 block">{stageLeads.length} Leads • ${totalValue}</span>
+            <div key={stage} className="w-[300px] flex flex-col flex-shrink-0">
+              {/* Column Header */}
+              <div className="flex items-center justify-between mb-4 px-1">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${stageColors[stage]}`} />
+                  <h3 className="text-sm font-semibold text-on-surface">{stageLabels[stage]}</h3>
+                  <span className="text-[11px] font-medium text-on-surface-variant/60 bg-surface-container-high px-1.5 py-0.5 rounded-md">{count}</span>
                 </div>
-                <span className="w-2 h-2 rounded-full bg-slate-700" />
+                <span className="text-[11px] font-medium text-on-surface-variant/60">{formatValue(total)}</span>
               </div>
 
-              {/* Stage Column Body */}
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-                {stageLeads.map((lead) => (
-                  <div 
-                    key={lead.id} 
-                    className="p-4 rounded-lg bg-slate-900/60 border border-slate-850 hover:border-slate-700 transition-all shadow-md group"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="text-xs font-bold text-slate-200 truncate group-hover:text-indigo-400 transition-colors">{lead.name}</h4>
-                      <div className="flex gap-1">
-                        <button 
-                          onClick={() => {
-                            const currentIdx = stages.indexOf(stage);
-                            if (currentIdx < stages.length - 1) {
-                              handleMoveStage(lead.id, stages[currentIdx + 1]);
-                            }
-                          }}
-                          title="Move Forward"
-                          className="p-0.5 hover:bg-slate-800 rounded text-slate-500 hover:text-indigo-400 transition-colors"
-                        >
-                          <ArrowRight size={12} />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteLead(lead.id)}
-                          title="Delete Lead"
-                          className="p-0.5 hover:bg-slate-850 rounded text-slate-500 hover:text-red-400 transition-colors"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </div>
+              {/* Cards */}
+              <div className="flex-1 flex flex-col gap-3 overflow-y-auto kanban-scroll pr-1.5 pb-6 scrollbar-thin">
+                <AnimatePresence>
+                  {items.map((lead) => {
+                    const isHighValue = parseInt(String(lead.value || '0').replace('$', '') || 0) >= 50000;
+                    const isTerminal = stage === 'Converted' || stage === 'Lost';
 
-                    <p className="text-[10px] text-slate-500 mt-1">{lead.phone}</p>
+                    return (
+                      <motion.div
+                        key={lead.id}
+                        layout
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        {isTerminal ? (
+                          <div className="bg-surface-container-low border border-outline-variant/10 rounded-xl p-3.5 card-hover cursor-pointer group">
+                            <div className="flex items-center gap-2.5 mb-2.5">
+                              <div className="w-7 h-7 rounded-md bg-surface-container-high border border-outline-variant/20 flex items-center justify-center text-[10px] font-bold text-on-surface flex-shrink-0">
+                                {getInitials(lead.name)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm font-medium text-on-surface truncate group-hover:text-primary transition-colors">{lead.name}</h4>
+                                <p className="text-[11px] text-on-surface-variant/60 truncate">{lead.phone}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-outline-variant/10 pt-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-on-surface-variant/50 bg-surface-container-high px-1.5 py-0.5 rounded">{lead.source}</span>
+                                <button onClick={() => handleDelete(lead.id)} className="text-on-surface-variant/40 hover:text-error transition-colors p-0.5">
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                              <span className="text-xs font-semibold text-on-surface-variant/70">{formatValue(lead.value)}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`glass-panel rounded-xl p-4 card-hover cursor-pointer group ${isHighValue ? 'border-primary/30 relative overflow-hidden' : ''}`}>
+                            {isHighValue && (
+                              <>
+                                <div className="absolute top-0 left-0 w-full h-0.5 bg-primary/60" />
+                                <div className="absolute -right-8 -top-8 w-24 h-24 bg-primary/8 blur-[24px] rounded-full pointer-events-none" />
+                              </>
+                            )}
+                            <div className="flex items-start justify-between mb-2.5 relative z-10">
+                              <div className="w-7 h-7 rounded-md bg-surface-container-high border border-outline-variant/20 flex items-center justify-center text-[10px] font-bold text-on-surface flex-shrink-0">
+                                {getInitials(lead.name)}
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                {isHighValue ? (
+                                  <span className="text-[10px] text-error font-semibold px-1.5 py-0.5 bg-error/10 rounded border border-error/20">Hot</span>
+                                ) : lead.createdAt ? (
+                                  <span className="text-[10px] text-on-surface-variant/50 px-1.5 py-0.5 bg-surface-container-low rounded border border-outline-variant/10">
+                                    {Math.floor((Date.now() - new Date(lead.createdAt).getTime()) / 86400000)}d
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <h4 className="text-sm font-semibold text-on-surface mb-0.5 group-hover:text-primary transition-colors relative z-10">{lead.name}</h4>
+                            <p className="text-[11px] text-on-surface-variant/60 mb-3 relative z-10">{lead.phone}{lead.email ? ` · ${lead.email}` : ''}</p>
+                            <div className="flex items-center justify-between border-t border-outline-variant/15 pt-2.5 relative z-10">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-on-surface-variant/50 bg-surface-container-high px-1.5 py-0.5 rounded">{lead.source}</span>
+                                {next && (
+                                  <button onClick={() => handleMove(lead.id, next)} className="p-0.5 rounded text-on-surface-variant/40 hover:text-primary transition-colors" title={`Move to ${stageLabels[next]}`}>
+                                    <ArrowRight size={13} />
+                                  </button>
+                                )}
+                                <button onClick={() => handleDelete(lead.id)} className="p-0.5 rounded text-on-surface-variant/40 hover:text-error transition-colors" title="Delete">
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                              <span className={`font-semibold ${isHighValue ? 'text-sm text-primary' : 'text-xs text-on-surface'}`}>
+                                {formatValue(lead.value)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
 
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/60">
-                      <span className="text-[10px] bg-slate-950 px-2 py-0.5 rounded text-slate-400 font-medium">
-                        {lead.source}
-                      </span>
-                      <span className="text-xs font-bold text-indigo-400">
-                        {lead.value}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-
-                {stageLeads.length === 0 && (
-                  <div className="h-24 flex items-center justify-center border border-dashed border-slate-800/40 rounded-lg text-[10px] text-slate-600">
-                    No leads in this stage
-                  </div>
-                )}
+                {count === 0 && <EmptyColumn label={stageLabels[stage]} />}
               </div>
             </div>
           );
         })}
+
+        {/* Add Column */}
+        <div className="w-[300px] flex-shrink-0 pt-[38px]">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="w-full h-11 rounded-xl border border-dashed border-outline-variant/25 text-on-surface-variant/50 hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+          >
+            <Plus size={16} /> Add Stage
+          </button>
+        </div>
       </div>
 
-      {/* Add Lead Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-6">
-            <h3 className="text-sm font-bold text-slate-200 mb-4">Add New Lead</h3>
-            
-            <form onSubmit={handleAddLead} className="space-y-4">
-              <div>
-                <label className="block text-[10px] text-slate-400 font-semibold mb-1 uppercase">Lead Name</label>
-                <input 
-                  type="text" 
-                  value={newLead.name}
-                  onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
-                  placeholder="e.g. Zunayed Chowdhury" 
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] text-slate-400 font-semibold mb-1 uppercase">Phone</label>
-                  <input 
-                    type="text" 
-                    value={newLead.phone}
-                    onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
-                    placeholder="e.g. +88017..." 
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 font-semibold mb-1 uppercase">Email</label>
-                  <input 
-                    type="email" 
-                    value={newLead.email}
-                    onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-                    placeholder="e.g. name@example.com" 
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[10px] text-slate-400 font-semibold mb-1 uppercase">Stage</label>
-                  <select 
-                    value={newLead.stage}
-                    onChange={(e) => setNewLead({ ...newLead, stage: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                  >
-                    {stages.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 font-semibold mb-1 uppercase">Source</label>
-                  <select 
-                    value={newLead.source}
-                    onChange={(e) => setNewLead({ ...newLead, source: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="Facebook">Facebook</option>
-                    <option value="WhatsApp">WhatsApp</option>
-                    <option value="Calling">Calling</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] text-slate-400 font-semibold mb-1 uppercase">Value ($)</label>
-                  <input 
-                    type="number" 
-                    value={newLead.value}
-                    onChange={(e) => setNewLead({ ...newLead, value: e.target.value })}
-                    placeholder="1500" 
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-800/60 mt-6">
-                <button 
-                  type="button" 
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-lg hover:bg-slate-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/10"
-                >
-                  Create Lead
+      {/* Add Deal Modal */}
+      <AnimatePresence>
+        {showAddModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowAddModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-w-md bg-surface-container border border-outline-variant/20 rounded-xl shadow-2xl p-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-base font-bold text-on-surface">Add New Deal</h3>
+                <button onClick={() => setShowAddModal(false)} className="text-on-surface-variant/50 hover:text-on-surface transition-colors p-0.5">
+                  <X size={18} />
                 </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
+              <form onSubmit={handleAdd} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] text-on-surface-variant font-semibold mb-1.5 uppercase tracking-wider">Contact Name</label>
+                  <input type="text" value={newLead.name} onChange={e => setNewLead({ ...newLead, name: e.target.value })} placeholder="e.g. John Doe" className="input-field" required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-on-surface-variant font-semibold mb-1.5 uppercase tracking-wider">Phone</label>
+                    <input type="text" value={newLead.phone} onChange={e => setNewLead({ ...newLead, phone: e.target.value })} placeholder="+88017..." className="input-field" required />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-on-surface-variant font-semibold mb-1.5 uppercase tracking-wider">Email</label>
+                    <input type="email" value={newLead.email} onChange={e => setNewLead({ ...newLead, email: e.target.value })} placeholder="name@example.com" className="input-field" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-on-surface-variant font-semibold mb-1.5 uppercase tracking-wider">Stage</label>
+                    <select value={newLead.stage} onChange={e => setNewLead({ ...newLead, stage: e.target.value })} className="input-field">
+                      {stages.map(s => <option key={s} value={s}>{stageLabels[s]}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-on-surface-variant font-semibold mb-1.5 uppercase tracking-wider">Source</label>
+                    <select value={newLead.source} onChange={e => setNewLead({ ...newLead, source: e.target.value })} className="input-field">
+                      <option value="Facebook">Facebook</option>
+                      <option value="WhatsApp">WhatsApp</option>
+                      <option value="Calling">Calling</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-on-surface-variant font-semibold mb-1.5 uppercase tracking-wider">Value ($)</label>
+                    <input type="number" value={newLead.value} onChange={e => setNewLead({ ...newLead, value: e.target.value })} placeholder="1500" className="input-field" />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-4 border-t border-outline-variant/20 mt-5">
+                  <button type="button" onClick={() => setShowAddModal(false)} className="btn-ghost text-xs">Cancel</button>
+                  <button type="submit" className="btn-primary text-xs">Create Deal</button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

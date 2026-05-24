@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { post } from '../utils/api';
 import { User, Lock, Eye, EyeOff, LogIn, ShieldAlert, Sparkles } from 'lucide-react';
 
@@ -11,14 +12,9 @@ export default function Login({ onLoginSuccess }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!username || !password) {
-      setError('Please enter both username and password.');
-      return;
-    }
-
+    if (!username || !password) { setError('Please enter both username and password.'); return; }
     setError('');
     setLoading(true);
-
     post('/api/users/login', { username, password })
       .then((data) => {
         if (data.success && data.user) {
@@ -29,163 +25,118 @@ export default function Login({ onLoginSuccess }) {
           setError('Authentication failed. Please try again.');
         }
       })
-      .catch((err) => {
-        console.error(err);
-        setError(err.message || 'Server connection failed. Is the backend running?');
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+      .catch((err) => { setError(err.message || 'Server connection failed.'); })
+      .finally(() => setLoading(false));
   };
 
-  const handleQuickFill = (userType) => {
-    if (userType === 'admin') {
-      setUsername('admin');
-      setPassword('admin123');
-    } else {
-      setUsername('agent');
-      setPassword('agent123');
-    }
+  const handleQuickFill = (type) => {
+    setUsername(type === 'admin' ? 'admin' : 'agent');
+    setPassword(type === 'admin' ? 'admin123' : 'agent123');
     setError('');
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#070b13] flex items-center justify-center overflow-y-auto px-4 py-8 font-sans select-none">
-      
-      {/* Background ambient glowing radial effects */}
-      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] rounded-full bg-indigo-600/10 blur-[120px] pointer-events-none animate-pulse"></div>
-      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[35rem] h-[35rem] rounded-full bg-purple-600/10 blur-[100px] pointer-events-none"></div>
+    <div className="fixed inset-0 z-50 bg-background flex items-center justify-center overflow-y-auto px-4 py-8 select-none">
+      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] rounded-full bg-primary/8 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[35rem] h-[35rem] rounded-full bg-primary/8 blur-[100px] pointer-events-none" />
 
-      <div className="w-full max-w-[440px] flex flex-col gap-6 z-10">
-        
-        {/* Brand Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="w-full max-w-[400px] flex flex-col gap-6 z-10"
+      >
+        {/* Brand */}
         <div className="flex flex-col items-center text-center gap-3">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-xl shadow-indigo-500/20">
-            <span className="font-bold text-white text-2xl tracking-wider">C</span>
+          <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center border border-primary/10">
+            <span className="text-primary text-xl font-bold">C</span>
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-              Custom CRM System
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">Provide credentials to access customer operations</p>
+            <h1 className="text-lg font-bold tracking-tight text-on-surface">Custom CRM</h1>
+            <p className="text-xs text-on-surface-variant/70 mt-1">Sign in to your account</p>
           </div>
         </div>
 
-        {/* Login Glass Card */}
-        <div className="glass-panel rounded-2xl border border-slate-800/80 p-8 shadow-2xl shadow-slate-950/50 relative overflow-hidden">
-          
-          {/* Subtle upper glow line */}
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent"></div>
+        {/* Card */}
+        <div className="glass-panel rounded-2xl border border-outline-variant/15 p-7 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            
-            {/* Display error alert */}
+          <form onSubmit={handleSubmit} className="space-y-4.5">
             {error && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold flex items-center gap-2 animate-shake">
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="p-3 bg-error/10 border border-error/20 text-error rounded-lg text-xs font-semibold flex items-center gap-2"
+              >
                 <ShieldAlert size={14} className="flex-shrink-0" />
                 <span>{error}</span>
-              </div>
+              </motion.div>
             )}
 
-            {/* Username Input */}
             <div className="space-y-1.5">
-              <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Username</label>
+              <label className="block text-[10px] text-on-surface-variant font-semibold uppercase tracking-wider">Username</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-3 flex items-center text-slate-500 pointer-events-none">
-                  <User size={16} />
-                </div>
+                <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none" />
                 <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter username"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/70 border border-slate-850 focus:border-indigo-500/70 rounded-xl text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-all"
-                  required
+                  type="text" value={username} onChange={e => setUsername(e.target.value)}
+                  placeholder="Enter username" className="input-field pl-9" required
                 />
               </div>
             </div>
 
-            {/* Password Input */}
             <div className="space-y-1.5">
-              <div className="flex justify-between items-center">
-                <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">Password</label>
-              </div>
+              <label className="block text-[10px] text-on-surface-variant font-semibold uppercase tracking-wider">Password</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-3 flex items-center text-slate-500 pointer-events-none">
-                  <Lock size={16} />
-                </div>
+                <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 pointer-events-none" />
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter password"
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-950/70 border border-slate-850 focus:border-indigo-500/70 rounded-xl text-xs text-slate-200 placeholder-slate-600 focus:outline-none transition-all"
-                  required
+                  type={showPassword ? 'text' : 'password'} value={password}
+                  onChange={e => setPassword(e.target.value)} placeholder="Enter password"
+                  className="input-field pl-9 pr-9" required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-3 flex items-center text-slate-500 hover:text-slate-300 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface transition-colors">
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
             </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 mt-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-650/20 hover:shadow-indigo-500/30 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed group"
+            <button type="submit" disabled={loading}
+              className="w-full py-2.5 mt-1 bg-primary text-on-primary hover:bg-primary-fixed disabled:opacity-50 text-sm font-semibold rounded-xl transition-all shadow-lg shadow-primary/15 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               {loading ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                <>
-                  <LogIn size={15} className="group-hover:translate-x-0.5 transition-transform" />
-                  <span>Secure Login</span>
-                </>
+                <><LogIn size={15} /><span>Sign In</span></>
               )}
             </button>
-
           </form>
 
-          {/* Quick Demoselect access section */}
-          <div className="mt-6 pt-5 border-t border-slate-850 flex flex-col gap-3">
-            <div className="flex items-center gap-1.5 text-slate-500">
-              <Sparkles size={13} className="text-indigo-400" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider">Simulation Account Presets</span>
+          <div className="mt-5 pt-4 border-t border-outline-variant/15">
+            <div className="flex items-center gap-1.5 mb-3">
+              <Sparkles size={12} className="text-on-surface-variant/50" />
+              <span className="text-[10px] font-semibold text-on-surface-variant/60 uppercase tracking-wider">Quick Access</span>
             </div>
-            
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => handleQuickFill('admin')}
-                className="py-1.5 px-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-850 hover:border-indigo-500/30 text-[11px] font-medium rounded-lg text-indigo-400 transition-all flex flex-col items-center justify-center"
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => handleQuickFill('admin')}
+                className="py-2 px-3 bg-surface-container-low/60 hover:bg-surface-container-low border border-outline-variant/15 hover:border-primary/25 text-[11px] font-medium rounded-lg text-on-surface-variant hover:text-primary transition-all"
               >
-                <span>Admin User</span>
-                <span className="text-[9px] text-slate-500 font-mono mt-0.5">admin / admin123</span>
+                <span className="block">Admin</span>
+                <span className="block text-[9px] text-on-surface-variant/40 font-mono mt-0.5">admin / admin123</span>
               </button>
-              
-              <button
-                type="button"
-                onClick={() => handleQuickFill('agent')}
-                className="py-1.5 px-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-850 hover:border-emerald-500/30 text-[11px] font-medium rounded-lg text-emerald-400 transition-all flex flex-col items-center justify-center"
+              <button type="button" onClick={() => handleQuickFill('agent')}
+                className="py-2 px-3 bg-surface-container-low/60 hover:bg-surface-container-low border border-outline-variant/15 hover:border-primary/25 text-[11px] font-medium rounded-lg text-on-surface-variant hover:text-primary transition-all"
               >
-                <span>Agent User</span>
-                <span className="text-[9px] text-slate-500 font-mono mt-0.5">agent / agent123</span>
+                <span className="block">Agent</span>
+                <span className="block text-[9px] text-on-surface-variant/40 font-mono mt-0.5">agent / agent123</span>
               </button>
             </div>
           </div>
-
         </div>
 
-        {/* Footer text */}
-        <p className="text-center text-[10px] text-slate-600">
-          Custom CRM &copy; {new Date().getFullYear()} - Handshaking Meta APIs
+        <p className="text-center text-[10px] text-on-surface-variant/30 font-medium">
+          Custom CRM &copy; {new Date().getFullYear()}
         </p>
-
-      </div>
+      </motion.div>
     </div>
   );
 }

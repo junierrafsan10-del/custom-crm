@@ -8,3 +8,5 @@ dist/
 *.log
 api_output.json
 *.swp
+opencode.json
+.vscode/

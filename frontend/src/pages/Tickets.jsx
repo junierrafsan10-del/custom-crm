@@ -103,7 +103,7 @@ export default function Tickets({ user }) {
     fetchTicketsData();
     let intervalId;
     if (liveMode) {
-      intervalId = setInterval(fetchTicketsData, 5000);
+      intervalId = setInterval(fetchTicketsData, 15000);
     }
     return () => {
       if (intervalId) clearInterval(intervalId);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { get, post } from './utils/api';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
@@ -17,7 +18,7 @@ import './App.css';
 
 export default function App() {
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const location = useLocation();
   
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('crm_user');
@@ -31,7 +32,6 @@ export default function App() {
     navigate('/login');
   };
 
-  // State to track Facebook & WhatsApp connections
   const [metaConnections, setMetaConnections] = useState({
     facebookConnected: false,
     facebookPageName: null,
@@ -59,7 +59,6 @@ export default function App() {
   useEffect(() => {
     fetchConnectionStatus();
 
-    // Check if path is redirect callback from Meta OAuth
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
@@ -96,14 +95,6 @@ export default function App() {
     }
   }, []);
 
-  // Handle setting active sidebar CSS property dynamically for Topbar left offset
-  useEffect(() => {
-    document.documentElement.style.setProperty(
-      '--sidebar-width', 
-      sidebarOpen ? '16rem' : '5rem'
-    );
-  }, [sidebarOpen]);
-
   if (!user) {
     return (
       <Routes>
@@ -114,72 +105,84 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex font-sans">
+    <div className="min-h-screen bg-background text-on-background flex antialiased bg-grid-pattern bg-grid">
       
-      {/* Sidebar Navigation */}
-      <Sidebar 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen} 
-        onLogout={handleLogout}
-      />
-
-      {/* Main Content Area */}
-      <div 
-        className={`flex-1 flex flex-col transition-all duration-300 min-w-0 ${
-          sidebarOpen ? 'pl-64' : 'pl-20'
-        }`}
-      >
-        {/* Topbar Header */}
-        <Topbar user={user} metaConnections={metaConnections} />
-
-        {/* Dynamic View Viewport */}
-        <main className="flex-1 pt-24 px-6 pb-6 overflow-y-auto max-w-[1600px] mx-auto w-full">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/chat" element={<Chat metaConnections={metaConnections} user={user} />} />
-            <Route path="/tickets" element={<Tickets user={user} />} />
-            <Route path="/leads" element={<Leads />} />
-            <Route path="/tasks" element={<Tasks />} />
-            <Route path="/members" element={<Members user={user} setUser={setUser} />} />
-            <Route path="/users" element={<Users />} />
-            <Route path="/settings" element={<Settings metaConnections={metaConnections} refreshStatus={fetchConnectionStatus} />} />
-            <Route path="/dialer" element={<Dialer />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
+      <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] right-[-5%] w-[800px] h-[800px] rounded-full bg-primary/5 blur-[120px]"></div>
+        <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-primary/5 blur-[100px]"></div>
       </div>
 
-      {/* Meta OAuth handshaking premium loader overlay */}
+      <Sidebar onLogout={handleLogout} user={user} />
+
+      <main className="flex-1 flex flex-col md:ml-72 min-h-screen relative w-full">
+        <Topbar user={user} metaConnections={metaConnections} />
+
+        <div className="flex-1 p-8 overflow-y-auto max-w-[1600px] mx-auto w-full">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+            >
+              <Routes location={location}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/chat" element={<Chat metaConnections={metaConnections} user={user} />} />
+                <Route path="/tickets" element={<Tickets user={user} />} />
+                <Route path="/leads" element={<Leads />} />
+                <Route path="/tasks" element={<Tasks />} />
+                <Route path="/members" element={<Members user={user} setUser={setUser} />} />
+                <Route path="/users" element={<Users />} />
+                <Route path="/settings" element={<Settings metaConnections={metaConnections} refreshStatus={fetchConnectionStatus} />} />
+                <Route path="/dialer" element={<Dialer />} />
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+
       {authLoading && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-6 transition-all duration-300">
-          <div className="relative mb-6">
-            <div className="w-16 h-16 rounded-full border-4 border-slate-800 border-t-indigo-500 animate-spin"></div>
-            <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-indigo-500/30 animate-pulse"></div>
-          </div>
-          <h2 className="text-lg font-bold text-slate-100 tracking-wide animate-pulse">Securing Meta API Handshake...</h2>
-          <p className="text-slate-400 text-xs mt-2 max-w-xs leading-relaxed">
-            Linking your Facebook Page and WhatsApp Business account to the Custom CRM platform. Please don't close this tab.
-          </p>
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex flex-col items-center justify-center text-center p-6">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="flex flex-col items-center"
+          >
+            <div className="relative mb-6">
+              <div className="w-16 h-16 rounded-full border-4 border-outline-variant/30 border-t-primary animate-spin"></div>
+              <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-primary/30 animate-pulse"></div>
+            </div>
+            <h2 className="text-lg font-bold text-on-surface tracking-wide animate-pulse">Securing Meta API Handshake...</h2>
+            <p className="text-on-surface-variant text-xs mt-2 max-w-xs leading-relaxed">
+              Linking your Facebook Page and WhatsApp Business account to the Custom CRM platform.
+            </p>
+          </motion.div>
         </div>
       )}
 
-      {/* Premium Toast notification for Success */}
       {authSuccess && (
-        <div className="fixed bottom-6 right-6 bg-slate-900 border border-emerald-500/30 text-emerald-400 px-4 py-3.5 rounded-xl text-xs font-semibold shadow-2xl shadow-emerald-950/20 flex items-center gap-3 z-50 animate-bounce">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></div>
-          <span>Successfully synchronized Facebook Page & WhatsApp Business API!</span>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed bottom-6 right-6 bg-surface-container border border-primary/30 text-primary px-4 py-3.5 rounded-xl text-xs font-semibold shadow-2xl shadow-primary/10 flex items-center gap-3 z-50"
+        >
+          <div className="w-2 h-2 rounded-full bg-primary animate-ping" />
+          <span>Successfully synchronized Facebook & WhatsApp API!</span>
+        </motion.div>
       )}
 
-      {/* Premium Toast notification for Failure */}
       {authError && (
-        <div className="fixed bottom-6 right-6 bg-slate-900 border border-red-500/30 text-red-400 px-4 py-3.5 rounded-xl text-xs font-semibold shadow-2xl shadow-red-950/20 flex items-center gap-3 z-50 animate-pulse">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed bottom-6 right-6 bg-surface-container border border-error/30 text-error px-4 py-3.5 rounded-xl text-xs font-semibold shadow-2xl shadow-error/10 flex items-center gap-3 z-50"
+        >
+          <div className="w-2 h-2 rounded-full bg-error" />
           <span>Connection Failed: {authError}</span>
-        </div>
+        </motion.div>
       )}
-
     </div>
   );
 }
-
