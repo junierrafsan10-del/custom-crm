@@ -30,6 +30,7 @@ export default function App() {
     localStorage.removeItem('crm_user');
     setUser(null);
     navigate('/login');
+    post('/api/auth/logout').catch(() => {});
   };
 
   const [metaConnections, setMetaConnections] = useState({

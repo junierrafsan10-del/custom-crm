@@ -155,16 +155,8 @@ router.put('/api/conversations/:id', requireAuth, [
   handleValidation
 ], async (req, res) => {
   try {
-    const { platform, participantId, ...updates } = req.body;
-    const conversationId = req.params.id;
-    let conv;
-    if (conversationId) {
-      conv = await Conversation.findById(conversationId);
-    } else if (platform && participantId) {
-      conv = await Conversation.findOne({ platform, participantId });
-    } else {
-      return res.status(400).json({ success: false, error: 'conversationId or platform+participantId required' });
-    }
+    const updates = req.body;
+    const conv = await Conversation.findById(req.params.id);
     if (!conv) {
       return res.status(404).json({ success: false, error: 'Conversation not found' });
     }
@@ -196,16 +188,7 @@ router.delete('/api/conversations/:id', requireAuth, [
   handleValidation
 ], async (req, res) => {
   try {
-    const { platform, participantId } = req.body;
-    const conversationId = req.params.id;
-    let conv;
-    if (conversationId) {
-      conv = await Conversation.findByIdAndDelete(conversationId);
-    } else if (platform && participantId) {
-      conv = await Conversation.findOneAndDelete({ platform, participantId });
-    } else {
-      return res.status(400).json({ success: false, error: 'conversationId or platform+participantId required' });
-    }
+    const conv = await Conversation.findByIdAndDelete(req.params.id);
     if (!conv) {
       return res.status(404).json({ success: false, error: 'Conversation not found' });
     }

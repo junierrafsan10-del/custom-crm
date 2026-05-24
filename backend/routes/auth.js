@@ -46,6 +46,15 @@ router.post('/api/users/login', loginLimiter, async (req, res) => {
   }
 });
 
+router.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('crm_token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict'
+  });
+  res.json({ success: true });
+});
+
 router.get('/api/auth/status', (req, res) => {
   res.json({ success: true, data: { message: 'Server is running', timestamp: new Date().toISOString() } });
 });
