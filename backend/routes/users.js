@@ -1,21 +1,50 @@
 const express = require('express');
+const { body, param, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const requireAuth = require('../middleware/auth');
+const requireAdmin = require('../middleware/requireAdmin');
 
 const router = express.Router();
 
+const userRoles = ['Admin', 'Agent'];
+
+const handleValidation = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+  next();
+};
+
 router.get('/api/users', requireAuth, async (req, res) => {
   try {
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
-    const safe = users.map(u => ({ ...u.toObject(), id: u._id.toString() }));
-    res.json({ success: true, users: safe });
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200);
+    const filter = {};
+    if (req.query.cursor) {
+      filter._id = { $lt: req.query.cursor };
+    }
+    const users = await User.find(filter).select('-password').sort({ createdAt: -1 }).limit(limit + 1);
+    const hasMore = users.length > limit;
+    const page = hasMore ? users.slice(0, limit) : users;
+    const safe = page.map(u => ({ ...u.toObject(), id: u._id.toString() }));
+    const nextCursor = hasMore ? page[page.length - 1]._id.toString() : null;
+    res.json({ success: true, users: safe, nextCursor });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.post('/api/users/create', requireAuth, async (req, res) => {
+router.post('/api/users/create', requireAuth, requireAdmin, [
+  body('username').trim().notEmpty().withMessage('username is required'),
+  body('password').notEmpty().withMessage('password is required').isLength({ min: 6 }).withMessage('password must be at least 6 characters'),
+  body('name').optional().trim(),
+  body('role').optional().isIn(userRoles).withMessage(`role must be one of: ${userRoles.join(', ')}`),
+  body('avatar').optional().trim(),
+  body('email').optional().trim(),
+  body('phone').optional().trim(),
+  handleValidation
+], async (req, res) => {
   try {
     const { username, password, name, role, avatar, email, phone } = req.body;
     const existing = await User.findOne({ username });
@@ -32,10 +61,20 @@ router.post('/api/users/create', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/api/users/update', requireAuth, async (req, res) => {
+router.put('/api/users/:id', requireAuth, requireAdmin, [
+  param('id').isMongoId().withMessage('Invalid user ID'),
+  body('username').optional().trim(),
+  body('password').optional().isLength({ min: 6 }).withMessage('password must be at least 6 characters'),
+  body('name').optional().trim(),
+  body('role').optional().isIn(userRoles).withMessage(`role must be one of: ${userRoles.join(', ')}`),
+  body('avatar').optional().trim(),
+  body('email').optional().trim(),
+  body('phone').optional().trim(),
+  handleValidation
+], async (req, res) => {
   try {
-    const { id, _id, username, password, name, role, avatar, email, phone } = req.body;
-    const userId = id || _id;
+    const { username, password, name, role, avatar, email, phone } = req.body;
+    const userId = req.params.id;
     const update = {};
     if (name !== undefined) update.name = name;
     if (role !== undefined) update.role = role;
@@ -56,9 +95,12 @@ router.post('/api/users/update', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/api/users/delete', requireAuth, async (req, res) => {
+router.delete('/api/users/:id', requireAuth, requireAdmin, [
+  param('id').isMongoId().withMessage('Invalid user ID'),
+  handleValidation
+], async (req, res) => {
   try {
-    const { id } = req.body;
+    const id = req.params.id;
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });

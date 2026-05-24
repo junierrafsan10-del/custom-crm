@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { get, post } from '../utils/api';
+import { get, post, del } from '../utils/api';
 import { 
   MessageSquare, 
   Phone, 
@@ -97,7 +97,7 @@ export default function Settings({ metaConnections, refreshStatus }) {
       return;
     }
     
-    post('/api/auth/disconnect', { platform })
+    del('/api/auth/disconnect?platform=' + platform)
       .then(data => {
         if (data.success) {
           refreshStatus();

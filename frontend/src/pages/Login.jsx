@@ -19,7 +19,6 @@ export default function Login({ onLoginSuccess }) {
       .then((data) => {
         if (data.success && data.user) {
           localStorage.setItem('crm_user', JSON.stringify(data.user));
-          if (data.token) localStorage.setItem('crm_token', data.token);
           onLoginSuccess(data.user);
         } else {
           setError('Authentication failed. Please try again.');

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { get, post } from '../utils/api';
+import { get, post, put, del } from '../utils/api';
 import { 
   MessageSquare, 
   MessageCircle, 
@@ -162,7 +162,7 @@ export default function Tickets({ user }) {
       agent: activeAgent
     };
 
-    post('/api/conversations/update', updatedFields)
+    put('/api/conversations/' + ticket._id, updatedFields)
       .then(data => {
         if (data.success) {
           fetchTicketsData();
@@ -194,7 +194,7 @@ export default function Tickets({ user }) {
       unpickReason: unpickReason.trim()
     };
 
-    post('/api/conversations/update', updatedFields)
+    put('/api/conversations/' + unpickTarget._id, updatedFields)
       .then(data => {
         if (data.success) {
           fetchTicketsData();
@@ -236,7 +236,7 @@ export default function Tickets({ user }) {
       participantId: ticket.participantId
     };
 
-    post('/api/conversations/delete', updatedFields)
+    del('/api/conversations/' + ticket._id)
       .then(data => {
         if (data.success) {
           fetchTicketsData();
@@ -256,7 +256,7 @@ export default function Tickets({ user }) {
       status: newStatus
     };
 
-    post('/api/conversations/update', updatedFields)
+    put('/api/conversations/' + ticket._id, updatedFields)
       .then(data => {
         if (data.success) {
           fetchTicketsData();
@@ -287,7 +287,7 @@ export default function Tickets({ user }) {
       labels: labelsArray
     };
 
-    post('/api/conversations/update', updatedFields)
+    put('/api/conversations/' + selectedTicket._id, updatedFields)
       .then(data => {
         if (data.success) {
           fetchTicketsData();

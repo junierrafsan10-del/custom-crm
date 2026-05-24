@@ -1,8 +1,19 @@
 const express = require('express');
+const { body, param, validationResult } = require('express-validator');
 const Conversation = require('../models/Conversation');
 const requireAuth = require('../middleware/auth');
 
 const router = express.Router();
+
+const convStatuses = ['New', 'Picked', 'Solved', 'Closed'];
+
+const handleValidation = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+  next();
+};
 
 function flattenMessages(conversations) {
   const messages = [];
@@ -48,15 +59,30 @@ async function getOrCreateConversation({ participantId, participantName, platfor
 
 router.get('/api/messages', requireAuth, async (req, res) => {
   try {
-    const conversations = await Conversation.find().sort({ updatedAt: -1 });
-    const messages = flattenMessages(conversations);
-    res.json({ success: true, conversations, messages });
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200);
+    const filter = {};
+    if (req.query.cursor) {
+      filter._id = { $lt: req.query.cursor };
+    }
+    const conversations = await Conversation.find(filter).sort({ updatedAt: -1 }).limit(limit + 1);
+    const hasMore = conversations.length > limit;
+    const page = hasMore ? conversations.slice(0, limit) : conversations;
+    const messages = flattenMessages(page);
+    const nextCursor = hasMore ? page[page.length - 1]._id.toString() : null;
+    res.json({ success: true, conversations: page, messages, nextCursor });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.post('/api/messages/send', requireAuth, async (req, res) => {
+router.post('/api/messages/send', requireAuth, [
+  body('recipientId').trim().notEmpty().withMessage('recipientId is required'),
+  body('platform').optional().trim(),
+  body('text').optional().trim(),
+  body('attachment').optional().trim(),
+  body('participantName').optional().trim(),
+  handleValidation
+], async (req, res) => {
   try {
     const { platform, recipientId, text, attachment, participantName } = req.body;
     if (!recipientId) {
@@ -86,7 +112,12 @@ router.post('/api/messages/send', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/api/conversations/read', requireAuth, async (req, res) => {
+router.post('/api/conversations/read', requireAuth, [
+  body('conversationId').optional().isMongoId().withMessage('Invalid conversationId'),
+  body('platform').optional().trim(),
+  body('participantId').optional().trim(),
+  handleValidation
+], async (req, res) => {
   try {
     const { conversationId, platform, participantId } = req.body;
     let conv;
@@ -108,9 +139,24 @@ router.post('/api/conversations/read', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/api/conversations/update', requireAuth, async (req, res) => {
+router.put('/api/conversations/:id', requireAuth, [
+  param('id').isMongoId().withMessage('Invalid conversation ID'),
+  body('platform').optional().trim(),
+  body('participantId').optional().trim(),
+  body('status').optional().isIn(convStatuses).withMessage(`status must be one of: ${convStatuses.join(', ')}`),
+  body('agent').optional().trim(),
+  body('category').optional().trim(),
+  body('notes').optional().trim(),
+  body('remarks').optional().trim(),
+  body('optAgent').optional().trim(),
+  body('referralTitle').optional().trim(),
+  body('lastMessage').optional().trim(),
+  body('unreadCount').optional().isNumeric().withMessage('unreadCount must be a number'),
+  handleValidation
+], async (req, res) => {
   try {
-    const { conversationId, platform, participantId, ...updates } = req.body;
+    const { platform, participantId, ...updates } = req.body;
+    const conversationId = req.params.id;
     let conv;
     if (conversationId) {
       conv = await Conversation.findById(conversationId);
@@ -143,9 +189,15 @@ router.post('/api/conversations/update', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/api/conversations/delete', requireAuth, async (req, res) => {
+router.delete('/api/conversations/:id', requireAuth, [
+  param('id').isMongoId().withMessage('Invalid conversation ID'),
+  body('platform').optional().trim(),
+  body('participantId').optional().trim(),
+  handleValidation
+], async (req, res) => {
   try {
-    const { conversationId, platform, participantId } = req.body;
+    const { platform, participantId } = req.body;
+    const conversationId = req.params.id;
     let conv;
     if (conversationId) {
       conv = await Conversation.findByIdAndDelete(conversationId);

@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { get, post } from './utils/api';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
+import BottomNav from './components/BottomNav';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
 import Tickets from './pages/Tickets';
@@ -27,7 +28,6 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('crm_user');
-    localStorage.removeItem('crm_token');
     setUser(null);
     navigate('/login');
   };
@@ -113,11 +113,12 @@ export default function App() {
       </div>
 
       <Sidebar onLogout={handleLogout} user={user} />
+      <BottomNav />
 
       <main className="flex-1 flex flex-col md:ml-72 min-h-screen relative w-full">
         <Topbar user={user} metaConnections={metaConnections} />
 
-        <div className="flex-1 p-8 overflow-y-auto max-w-[1600px] mx-auto w-full">
+        <div className="flex-1 p-8 pb-20 md:pb-8 overflow-y-auto max-w-[1600px] mx-auto w-full">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}

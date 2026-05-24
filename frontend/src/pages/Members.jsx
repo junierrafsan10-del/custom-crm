@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { get, post } from '../utils/api';
+import { get, post, put, del } from '../utils/api';
 import { 
   Users, 
   UserPlus, 
@@ -156,7 +156,9 @@ export default function Members({ user, setUser }) {
     }
 
     try {
-      const data = await post('/api/users/update', payload);
+      const memberId = selectedMember.id || selectedMember._id;
+      const { id, ...bodyPayload } = payload;
+      const data = await put('/api/users/' + memberId, bodyPayload);
       if (data.success) {
         setShowEditModal(false);
         fetchMembers();
@@ -187,14 +189,13 @@ export default function Members({ user, setUser }) {
     }
 
     try {
-      const data = await post('/api/users/delete', { id: memberId });
+      const data = await del('/api/users/' + memberId);
       if (data.success) {
         fetchMembers();
 
         const currentUserId = user.id || user._id;
         if (currentUserId === memberId) {
           localStorage.removeItem('crm_user');
-          localStorage.removeItem('crm_token');
           setUser(null);
         }
       }

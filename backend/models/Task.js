@@ -6,7 +6,7 @@ const taskSchema = new mongoose.Schema({
   priority: { type: String, enum: ['High', 'Medium', 'Low'], default: 'Medium' },
   status: { type: String, enum: ['Open', 'In Progress', 'Blocked', 'Closed'], default: 'Open' },
   dueDate: { type: String, default: '' },
-  assignee: { type: String, default: 'Support Member A' }
+  assignee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Task', taskSchema);
