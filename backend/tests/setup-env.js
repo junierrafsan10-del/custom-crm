@@ -1,0 +1,9 @@
+process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
+process.env.JWT_SECRET = 'test-secret-that-is-at-least-32-characters-long-ok';
+process.env.FRONTEND_URL = 'http://localhost:5173';
+process.env.NODE_ENV = 'test';
+process.env.BODY_LIMIT = '1mb';
+process.env.UPLOAD_MAX_BYTES = '5242880';
+process.env.MAX_LOGIN_ATTEMPTS = '5';
+process.env.ACCOUNT_LOCKOUT_MINUTES = '15';
+process.env.JWT_EXPIRY = '1h';

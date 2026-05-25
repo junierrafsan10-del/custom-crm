@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { get, post, put, del } from '../utils/api';
 import { 
   MessageSquare, 
@@ -6,12 +6,7 @@ import {
   Send, 
   User, 
   Clock, 
-  Tag, 
-  ChevronRight, 
-  Plus, 
   X, 
-  Filter, 
-  Check, 
   AlertCircle, 
   Info, 
   RefreshCw, 
@@ -19,27 +14,9 @@ import {
   CheckCircle2, 
   XCircle, 
   MessageSquareDashed, 
-  Laptop, 
-  CheckSquare, 
   Trash2 
 } from 'lucide-react';
-
-const Facebook = (props) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width={props.size || 24} 
-    height={props.size || 24} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={props.className}
-  >
-    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-  </svg>
-);
+import FacebookIcon from '../components/icons/FacebookIcon';
 
 export default function Tickets({ user }) {
   const [tickets, setTickets] = useState([]);
@@ -52,12 +29,6 @@ export default function Tickets({ user }) {
   const [filterTab, setFilterTab] = useState('new'); // 'new', 'picked', 'solved', 'closed'
   const [liveMode, setLiveMode] = useState(true);
 
-  useEffect(() => {
-    if (user?.name) {
-      setActiveAgent(user.name);
-    }
-  }, [user]);
-  
   // Selected Ticket details side-drawer
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyText, setReplyText] = useState('');
@@ -98,43 +69,28 @@ export default function Tickets({ user }) {
       });
   };
 
-  // Poll for live mode updates
+  // Poll for live mode updates (respects page visibility)
   useEffect(() => {
     fetchTicketsData();
     let intervalId;
     if (liveMode) {
       intervalId = setInterval(fetchTicketsData, 15000);
     }
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (intervalId) clearInterval(intervalId);
+      } else if (liveMode) {
+        if (intervalId) clearInterval(intervalId);
+        fetchTicketsData();
+        intervalId = setInterval(fetchTicketsData, 15000);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
     return () => {
       if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [liveMode]);
-
-  // Sync edit state details ONLY when the selected ticket ID changes
-  const selectedTicketKey = selectedTicket ? `${selectedTicket.platform}-${selectedTicket.participantId}` : null;
-  useEffect(() => {
-    if (selectedTicket) {
-      setEditRemarks(selectedTicket.remarks || '');
-      setEditCategory(selectedTicket.category || '');
-      setEditOptAgent(selectedTicket.optAgent || '');
-      setEditLabels(selectedTicket.labels ? selectedTicket.labels.join(', ') : '');
-      
-      // Auto-scroll chat history of the selected ticket to bottom
-      setTimeout(scrollToBottom, 80);
-    }
-  }, [selectedTicketKey]);
-
-  // Keep selectedTicket synchronized with latest ticket data from polling/fetches
-  useEffect(() => {
-    if (selectedTicket) {
-      const latest = tickets.find(
-        t => t.participantId === selectedTicket.participantId && t.platform === selectedTicket.platform
-      );
-      if (latest) {
-        setSelectedTicket(latest);
-      }
-    }
-  }, [tickets]);
 
   // Keep chat scrolled to bottom
   const scrollToBottom = () => {
@@ -142,6 +98,20 @@ export default function Tickets({ user }) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  const handleSelectTicket = useCallback((ticket) => {
+    setSelectedTicket(ticket);
+    setEditRemarks(ticket.remarks || '');
+    setEditCategory(ticket.category || '');
+    setEditOptAgent(ticket.optAgent || '');
+    setEditLabels(ticket.labels ? ticket.labels.join(', ') : '');
+    setTimeout(scrollToBottom, 80);
+  }, []);
+
+  // Keep selectedTicket synchronized with latest ticket data from polling
+  const resolvedSelectedTicket = selectedTicket && tickets.find(
+    t => t.participantId === selectedTicket.participantId && t.platform === selectedTicket.platform
+  ) || selectedTicket;
 
   // Auto-scroll on new message addition in active ticket
   const ticketMessagesCount = selectedTicket 
@@ -152,7 +122,7 @@ export default function Tickets({ user }) {
     if (selectedTicket) {
       scrollToBottom();
     }
-  }, [ticketMessagesCount]);
+  }, [ticketMessagesCount, selectedTicket]);
 
   // Handle Pick Action
   const handlePickTicket = (ticket) => {
@@ -230,11 +200,6 @@ export default function Tickets({ user }) {
     if (!window.confirm(confirmMsg)) {
       return;
     }
-
-    const updatedFields = {
-      platform: ticket.platform,
-      participantId: ticket.participantId
-    };
 
     del('/api/conversations/' + ticket._id)
       .then(data => {
@@ -332,8 +297,8 @@ export default function Tickets({ user }) {
       });
   };
 
-  // Filter visibility list
-  const filteredTickets = tickets.filter(ticket => {
+  // Filter visibility list (memoized)
+  const filteredTickets = useMemo(() => tickets.filter(ticket => {
     // 1. Hide if assigned to another agent
     if (ticket.agent && ticket.agent !== activeAgent) {
       return false;
@@ -354,7 +319,7 @@ export default function Tickets({ user }) {
       default:
         return true;
     }
-  });
+  }), [tickets, activeAgent, filterTab]);
 
   const getSourceIcon = (ticket) => {
     if (ticket.platform === 'whatsapp') {
@@ -363,7 +328,7 @@ export default function Tickets({ user }) {
     if (ticket.category === 'Comment') {
       return <MessageSquareDashed size={14} className="text-amber-500" />;
     }
-    return <Facebook size={14} className="text-blue-500" />;
+    return <FacebookIcon size={14} className="text-blue-500" />;
   };
 
   const getSourceLabel = (ticket) => {
@@ -392,8 +357,8 @@ export default function Tickets({ user }) {
   };
 
   // Get conversation messages
-  const activeTicketMessages = selectedTicket 
-    ? messages.filter(m => m.senderId === selectedTicket.participantId || m.recipientId === selectedTicket.participantId)
+  const activeTicketMessages = resolvedSelectedTicket 
+    ? messages.filter(m => m.senderId === resolvedSelectedTicket.participantId || m.recipientId === resolvedSelectedTicket.participantId)
     : [];
 
   return (
@@ -540,7 +505,7 @@ export default function Tickets({ user }) {
                     return (
                       <tr 
                         key={`${ticket.platform}-${ticket.participantId}`}
-                        onClick={() => setSelectedTicket(ticket)}
+                        onClick={() => handleSelectTicket(ticket)}
                         className={`transition-colors cursor-pointer group hover:bg-slate-850/30 ${
                           isSelected ? 'bg-indigo-600/10 hover:bg-indigo-600/15 border-l-2 border-indigo-500' : ''
                         }`}
@@ -728,7 +693,7 @@ export default function Tickets({ user }) {
         </div>
 
         {/* Right Side Details Side-Drawer Panel */}
-        {selectedTicket && (
+        {resolvedSelectedTicket && (
           <div className="w-[450px] bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden flex flex-col sticky top-24 max-h-[calc(100vh-10rem)] transition-all animate-in slide-in-from-right duration-250 z-10 flex-shrink-0">
             {/* Detail Header */}
             <div className="p-4 border-b border-slate-800 bg-slate-950/60 flex items-center justify-between">

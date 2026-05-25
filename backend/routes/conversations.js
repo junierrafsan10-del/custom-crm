@@ -1,19 +1,11 @@
 const express = require('express');
-const { body, param, validationResult } = require('express-validator');
+const { body, param } = require('express-validator');
 const Conversation = require('../models/Conversation');
 const requireAuth = require('../middleware/auth');
+const { CONVERSATION_STATUSES } = require('../src/constants');
+const { handleValidation } = require('../src/utils/validation');
 
 const router = express.Router();
-
-const convStatuses = ['New', 'Picked', 'Solved', 'Closed'];
-
-const handleValidation = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, errors: errors.array() });
-  }
-  next();
-};
 
 function flattenMessages(conversations) {
   const messages = [];
@@ -71,23 +63,21 @@ router.get('/api/messages', requireAuth, async (req, res) => {
     const nextCursor = hasMore ? page[page.length - 1]._id.toString() : null;
     res.json({ success: true, conversations: page, messages, nextCursor });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('List messages error:', err);
+    res.status(500).json({ success: false, error: 'Failed to list messages' });
   }
 });
 
 router.post('/api/messages/send', requireAuth, [
-  body('recipientId').trim().notEmpty().withMessage('recipientId is required'),
-  body('platform').optional().trim(),
-  body('text').optional().trim(),
-  body('attachment').optional().trim(),
-  body('participantName').optional().trim(),
+  body('recipientId').trim().notEmpty().withMessage('Recipient ID is required').isLength({ max: 200 }),
+  body('platform').optional().trim().isLength({ max: 50 }),
+  body('text').optional().trim().isLength({ max: 5000 }),
+  body('attachment').optional().trim().isLength({ max: 500 }),
+  body('participantName').optional().trim().isLength({ max: 200 }),
   handleValidation
 ], async (req, res) => {
   try {
     const { platform, recipientId, text, attachment, participantName } = req.body;
-    if (!recipientId) {
-      return res.status(400).json({ success: false, error: 'recipientId is required' });
-    }
     const conv = await getOrCreateConversation({
       participantId: recipientId,
       participantName: participantName || recipientId,
@@ -106,16 +96,17 @@ router.post('/api/messages/send', requireAuth, [
     conv.lastMessage = text || (attachment ? 'Sent an attachment' : '');
     conv.unreadCount = 0;
     await conv.save();
-    res.json({ success: true, data: { message } });
+    res.status(201).json({ success: true, data: { message } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Send message error:', err);
+    res.status(500).json({ success: false, error: 'Failed to send message' });
   }
 });
 
 router.post('/api/conversations/read', requireAuth, [
-  body('conversationId').optional().isMongoId().withMessage('Invalid conversationId'),
-  body('platform').optional().trim(),
-  body('participantId').optional().trim(),
+  body('conversationId').optional().isMongoId().withMessage('Invalid conversation ID'),
+  body('platform').optional().trim().isLength({ max: 50 }),
+  body('participantId').optional().trim().isLength({ max: 200 }),
   handleValidation
 ], async (req, res) => {
   try {
@@ -135,56 +126,54 @@ router.post('/api/conversations/read', requireAuth, [
     await conv.save();
     res.json({ success: true, data: conv });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Mark conversation read error:', err);
+    res.status(500).json({ success: false, error: 'Failed to mark conversation as read' });
   }
 });
 
 router.put('/api/conversations/:id', requireAuth, [
   param('id').isMongoId().withMessage('Invalid conversation ID'),
-  body('platform').optional().trim(),
-  body('participantId').optional().trim(),
-  body('status').optional().isIn(convStatuses).withMessage(`status must be one of: ${convStatuses.join(', ')}`),
-  body('agent').optional().trim(),
-  body('category').optional().trim(),
-  body('notes').optional().trim(),
-  body('remarks').optional().trim(),
-  body('optAgent').optional().trim(),
-  body('referralTitle').optional().trim(),
-  body('lastMessage').optional().trim(),
+  body('status').optional().isIn(CONVERSATION_STATUSES).withMessage(`Status must be one of: ${CONVERSATION_STATUSES.join(', ')}`),
+  body('agent').optional().trim().isLength({ max: 200 }),
+  body('category').optional().trim().isLength({ max: 100 }),
+  body('labels').optional().isArray().withMessage('Labels must be an array'),
+  body('notes').optional().trim().isLength({ max: 2000 }),
+  body('remarks').optional().trim().isLength({ max: 1000 }),
+  body('optAgent').optional().trim().isLength({ max: 200 }),
+  body('referralTitle').optional().trim().isLength({ max: 200 }),
+  body('lastMessage').optional().trim().isLength({ max: 1000 }),
   body('unreadCount').optional().isNumeric().withMessage('unreadCount must be a number'),
   handleValidation
 ], async (req, res) => {
   try {
-    const updates = req.body;
     const conv = await Conversation.findById(req.params.id);
     if (!conv) {
       return res.status(404).json({ success: false, error: 'Conversation not found' });
     }
     const allowed = ['status', 'agent', 'category', 'labels', 'notes', 'remarks', 'optAgent', 'referralTitle', 'lastMessage', 'unreadCount'];
-    Object.keys(updates).forEach(key => {
+    Object.keys(req.body).forEach(key => {
       if (allowed.includes(key)) {
-        conv[key] = updates[key];
+        conv[key] = req.body[key];
       }
     });
-    if (updates.unpickBy && updates.unpickReason) {
+    if (req.body.unpickBy && req.body.unpickReason) {
       conv.unpickHistory = conv.unpickHistory || [];
       conv.unpickHistory.push({
-        agent: updates.unpickBy,
+        agent: req.body.unpickBy,
         timestamp: new Date(),
-        reason: updates.unpickReason
+        reason: req.body.unpickReason
       });
     }
     await conv.save();
     res.json({ success: true, data: conv });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Update conversation error:', err);
+    res.status(500).json({ success: false, error: 'Failed to update conversation' });
   }
 });
 
 router.delete('/api/conversations/:id', requireAuth, [
   param('id').isMongoId().withMessage('Invalid conversation ID'),
-  body('platform').optional().trim(),
-  body('participantId').optional().trim(),
   handleValidation
 ], async (req, res) => {
   try {
@@ -194,7 +183,8 @@ router.delete('/api/conversations/:id', requireAuth, [
     }
     res.json({ success: true, data: { message: 'Conversation deleted' } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Delete conversation error:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete conversation' });
   }
 });
 

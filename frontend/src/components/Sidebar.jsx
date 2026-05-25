@@ -1,121 +1,83 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  MessageSquare,
-  Ticket,
-  Phone,
-  Contact,
-  CheckSquare,
-  ShieldCheck,
-  Settings,
-  Handshake,
-  LogOut
+  LayoutDashboard, MessageSquare, Ticket, Phone, Contact,
+  CheckSquare, ShieldCheck, Settings, Handshake, LogOut,
 } from 'lucide-react';
 
 const menuItems = [
   { id: 'dashboard', path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'chat', path: '/chat', label: 'Inbox & Meta Chat', icon: MessageSquare },
-  { id: 'tickets', path: '/tickets', label: 'Tickets Portal', icon: Ticket },
-  { id: 'dialer', path: '/dialer', label: 'Dialer & Calls', icon: Phone },
+  { id: 'chat', path: '/chat', label: 'Inbox & Chat', icon: MessageSquare },
+  { id: 'tickets', path: '/tickets', label: 'Tickets', icon: Ticket },
+  { id: 'dialer', path: '/dialer', label: 'Dialer', icon: Phone },
   { id: 'leads', path: '/leads', label: 'Deals', icon: Handshake },
   { id: 'users', path: '/users', label: 'Users', icon: Contact },
-  { id: 'tasks', path: '/tasks', label: 'Task Management', icon: CheckSquare },
+  { id: 'tasks', path: '/tasks', label: 'Tasks', icon: CheckSquare },
   { id: 'members', path: '/members', label: 'Members', icon: ShieldCheck },
 ];
 
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.03 }
-  }
-};
-
-const item = {
-  hidden: { opacity: 0, x: -12 },
-  show: { opacity: 1, x: 0 }
-};
-
 export default function Sidebar({ onLogout, user }) {
+  const location = useLocation();
   const displayName = user?.name || 'User';
   const displayRole = user?.role || 'User';
   const avatarUrl = user?.avatar || '';
 
   return (
-    <nav className="bg-surface-container-lowest h-screen w-72 flex flex-col fixed left-0 top-0 border-r border-outline-variant/30 z-40 hidden md:flex">
-      <div className="flex flex-col h-full py-8 w-full px-5">
-        {/* Brand Logo */}
-        <div className="flex items-center gap-3 mb-8 px-3">
-          <div className="w-9 h-9 rounded-lg bg-primary/20 flex items-center justify-center">
+    <nav className="bg-surface-container-lowest h-screen w-72 flex flex-col fixed left-0 top-0 border-r border-outline-variant/20 z-40 hidden md:flex">
+      <div className="flex flex-col h-full py-7 w-full px-4">
+        {/* Brand */}
+        <div className="flex items-center gap-3 mb-7 px-3">
+          <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center border border-primary/10">
             <span className="text-primary text-lg font-bold">C</span>
           </div>
           <div>
             <h1 className="text-sm font-bold text-primary tracking-tight">Custom CRM</h1>
-            <p className="text-[10px] text-on-surface-variant uppercase tracking-[0.12em] mt-0.5 font-medium">Intelligent Suite</p>
+            <p className="text-[9px] text-on-surface-variant/60 uppercase tracking-[0.15em] mt-0.5 font-semibold">Intelligent Suite</p>
           </div>
         </div>
 
-        {/* CTA */}
-        <button className="w-full bg-primary text-on-primary text-sm font-semibold py-2.5 rounded-full hover:bg-primary-fixed transition-all mb-6 flex items-center justify-center gap-2 active:scale-[0.97] shadow-lg shadow-primary/20">
-          <span className="material-symbols-outlined text-[18px]">add</span>
-          Add Record
-        </button>
-
         {/* Main Navigation */}
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="flex-1 space-y-0.5"
-        >
-          {menuItems.map((menuItem) => {
-            const Icon = menuItem.icon;
+        <div className="flex-1 space-y-0.5">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
             return (
-              <motion.div key={menuItem.id} variants={item}>
-                <NavLink
-                  to={menuItem.path}
-                  end={menuItem.id === 'dashboard'}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
-                      isActive
-                        ? 'text-primary bg-primary/8 border-l-2 border-primary'
-                        : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
-                    }`
-                  }
-                >
-                  <Icon
-                    size={18}
-                    className="flex-shrink-0 transition-colors duration-200"
-                  />
-                  <span>{menuItem.label}</span>
-                </NavLink>
-              </motion.div>
+              <NavLink
+                key={item.id}
+                to={item.path}
+                end={item.id === 'dashboard'}
+                className={`flex items-center gap-3.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+                  isActive
+                    ? 'text-primary bg-primary/8 border-l-[2.5px] border-primary shadow-sm'
+                    : 'text-on-surface-variant/70 hover:bg-surface-container-high hover:text-on-surface border-l-[2.5px] border-transparent'
+                }`}
+              >
+                <Icon size={18} className="flex-shrink-0" />
+                <span>{item.label}</span>
+              </NavLink>
             );
           })}
-        </motion.div>
+        </div>
 
-        {/* Footer */}
-        <div className="pt-4 border-t border-outline-variant/20 mt-auto">
+        {/* Settings */}
+        <div className="pt-4 border-t border-outline-variant/10 mt-auto">
           <NavLink
             to="/settings"
             className={({ isActive }) =>
-              `flex items-center gap-3.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
+              `flex items-center gap-3.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? 'text-primary bg-primary/8 border-l-2 border-primary'
-                  : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
+                  ? 'text-primary bg-primary/8 border-l-[2.5px] border-primary shadow-sm'
+                  : 'text-on-surface-variant/70 hover:bg-surface-container-high hover:text-on-surface border-l-[2.5px] border-transparent'
               }`
             }
           >
-            <Settings size={18} className="flex-shrink-0 transition-colors duration-200" />
+            <Settings size={18} />
             <span>Settings</span>
           </NavLink>
         </div>
 
         {/* User Profile */}
-        <div className="mt-4 flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface-container-low/80 border border-outline-variant/10">
-          <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-sm border border-primary/20 overflow-hidden flex-shrink-0">
+        <div className="mt-4 flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface-container-low/70 border border-outline-variant/10">
+          <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center text-primary font-bold text-sm border border-primary/15 overflow-hidden flex-shrink-0">
             {avatarUrl ? (
               <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
             ) : (
@@ -123,15 +85,15 @@ export default function Sidebar({ onLogout, user }) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-on-surface truncate">{displayName}</p>
-            <p className="text-[11px] text-on-surface-variant truncate font-medium">{displayRole}</p>
+            <p className="text-sm font-semibold text-on-surface truncate">{displayName}</p>
+            <p className="text-[10px] text-on-surface-variant/60 truncate font-medium">{displayRole}</p>
           </div>
           <button
             onClick={onLogout}
-            className="text-on-surface-variant hover:text-error transition-colors p-1 rounded hover:bg-error/10"
+            className="text-on-surface-variant/50 hover:text-error transition-colors p-1.5 rounded-lg hover:bg-error/10 flex-shrink-0 cursor-pointer"
             title="Logout"
           >
-            <LogOut size={15} />
+            <LogOut size={14} />
           </button>
         </div>
       </div>

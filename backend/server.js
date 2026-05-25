@@ -5,88 +5,157 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
+const compression = require('compression');
+const morgan = require('morgan');
 const path = require('path');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
-const User = require('./models/User');
+const config = require('./utils/env');
+const logger = require('./src/utils/logger');
+const requestId = require('./utils/requestId');
+const { xssSanitize, mongoIdSanitize } = require('./middleware/security');
+const { auditLog } = require('./middleware/audit');
+const { errorHandler, notFoundHandler } = require('./utils/errors');
 
 const app = express();
 
-app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+app.set('trust proxy', 1);
+
+app.use(compression());
+
+app.use(morgan(config.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+app.use(helmet({
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
+app.use(cors({
+  origin: config.FRONTEND_URL,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  maxAge: 86400
+}));
+
+app.use(express.json({ limit: config.BODY_LIMIT }));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
 app.use(cookieParser());
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(requestId);
+app.use(auditLog);
+app.use(xssSanitize);
+app.use(mongoIdSanitize);
 
-const limiter = rateLimit({
+const uploadsDir = path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadsDir, {
+  dotfiles: 'deny',
+  index: false,
+  maxAge: '1d'
+}));
+
+const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later' }
 });
-app.use('/api/', limiter);
+app.use('/api/', globalLimiter);
 
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/users');
-const leadRoutes = require('./routes/leads');
-const conversationRoutes = require('./routes/conversations');
-const customerRoutes = require('./routes/customers');
-const notificationRoutes = require('./routes/notifications');
-const uploadRoutes = require('./routes/upload');
-const tunnelRoutes = require('./routes/tunnel');
-const taskRoutes = require('./routes/tasks');
-
-app.use(authRoutes);
-app.use(userRoutes);
-app.use(leadRoutes);
-app.use(conversationRoutes);
-app.use(customerRoutes);
-app.use(notificationRoutes);
-app.use(uploadRoutes);
-app.use(tunnelRoutes);
-app.use(taskRoutes);
-
-app.get('/api/health', (req, res) => {
-  res.json({ success: true, data: { status: 'ok', uptime: process.uptime() } });
-});
-
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ success: false, error: 'Internal server error' });
-});
-
-const PORT = process.env.PORT || 5000;
-
-async function seedDefaultUsers() {
-  const count = await User.countDocuments();
-  if (count === 0) {
-    const adminHash = bcrypt.hashSync('admin123', 10);
-    const agentHash = bcrypt.hashSync('agent123', 10);
-    await User.create({ username: 'admin', password: adminHash, name: 'Admin', role: 'Admin' });
-    await User.create({ username: 'agent', password: agentHash, name: 'Support Member A', role: 'Agent' });
-    console.log('Default users seeded (admin / admin123) and (agent / agent123)');
+app.use('/api/', (req, res, next) => {
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    const xrw = req.headers['x-requested-with'];
+    if (xrw && xrw !== 'XMLHttpRequest') {
+      return res.status(400).json({ success: false, error: 'Invalid request' });
+    }
   }
-}
+  next();
+});
+
+app.use(require('./routes/auth'));
+app.use(require('./routes/users'));
+app.use(require('./routes/leads'));
+app.use(require('./routes/conversations'));
+app.use(require('./routes/customers'));
+app.use(require('./routes/notifications'));
+app.use(require('./routes/upload'));
+app.use(require('./routes/tunnel'));
+app.use(require('./routes/tasks'));
+
+const startTime = Date.now();
+
+app.get('/api/health', (_req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const dbStatus = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  res.json({
+    success: true,
+    data: {
+      status: dbState === 1 ? 'healthy' : 'degraded',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      mongodb: dbStatus[dbState] || 'unknown',
+      memory: process.memoryUsage(),
+      pid: process.pid
+    }
+  });
+});
+
+app.get('/api/ready', (_req, res) => {
+  if (mongoose.connection.readyState === 1) {
+    res.json({ success: true, data: { status: 'ready' } });
+  } else {
+    res.status(503).json({ success: false, error: 'Database not connected' });
+  }
+});
+
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+let server;
 
 async function start() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
-    console.log('Connected to MongoDB');
+    await mongoose.connect(config.MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 30000,
+      maxPoolSize: 10
+    });
+    logger.info('Connected to MongoDB');
   } catch (err) {
-    console.error('Failed to connect to MongoDB:', err.message);
-    console.error('Make sure MONGODB_URI is set correctly in backend/.env');
+    logger.error('Failed to connect to MongoDB', { error: err.message });
     process.exit(1);
   }
-  await seedDefaultUsers();
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+
+  server = app.listen(config.PORT, () => {
+    logger.info(`Server running on port ${config.PORT} in ${config.NODE_ENV} mode`);
   });
 }
 
+function gracefulShutdown(signal) {
+  logger.info(`${signal} received. Shutting down gracefully...`);
+  if (server) {
+    server.close(async () => {
+      logger.info('HTTP server closed');
+      await mongoose.connection.close();
+      logger.info('MongoDB connection closed');
+      process.exit(0);
+    });
+    setTimeout(() => {
+      logger.error('Forced shutdown after timeout');
+      process.exit(1);
+    }, 30000);
+  } else {
+    process.exit(0);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 start().catch(err => {
-  console.error('Failed to start server:', err.message);
+  logger.error('Failed to start server', { error: err.message });
   process.exit(1);
 });
+
+module.exports = app;

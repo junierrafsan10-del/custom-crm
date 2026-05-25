@@ -1,19 +1,15 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
-  Phone, 
   PhoneCall, 
   PhoneOff, 
   Delete, 
   Play, 
-  Pause,
-  MessageSquare,
   Search,
   Volume2,
   Mic,
   MicOff,
   Disc,
-  Send,
-  Users
+  Send
 } from 'lucide-react';
 
 export default function Dialer() {

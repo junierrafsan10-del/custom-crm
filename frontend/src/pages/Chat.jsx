@@ -1,12 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { get, post, put, del } from '../utils/api';
-import { Send, Plus, Trash2, Edit2 } from 'lucide-react';
 import ConversationList from '../components/chat/ConversationList';
 import MessageThread from '../components/chat/MessageThread';
 import MessageInput from '../components/chat/MessageInput';
 import ConversationDetail from '../components/chat/ConversationDetail';
-import UnpickModal from '../components/chat/UnpickModal';
-import ConvertLeadModal from '../components/chat/ConvertLeadModal';
+
+const UnpickModal = lazy(() => import('../components/chat/UnpickModal'));
+const ConvertLeadModal = lazy(() => import('../components/chat/ConvertLeadModal'));
+
+function ModalFallback() {
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-outline-variant/30 border-t-primary animate-spin" />
+    </div>
+  );
+}
 
 export default function Chat({ metaConnections, user }) {
   const [activeChat, setActiveChat] = useState(null);
@@ -36,11 +44,11 @@ export default function Chat({ metaConnections, user }) {
 
   const triggerToast = (msg) => { setToastMessage(msg); setShowToast(true); setTimeout(() => setShowToast(false), 4000); };
 
-  const fetchLeads = () => {
+  const fetchLeads = useCallback(() => {
     get('/api/leads').then(data => { if (data.success && data.data) setLeads(data.data); }).catch(err => console.error('Error fetching leads:', err));
-  };
+  }, []);
 
-  const fetchMessages = () => {
+  const fetchMessages = useCallback(() => {
     get('/api/messages').then(data => {
       if (!data.success) return;
       const formattedChats = data.conversations
@@ -53,31 +61,40 @@ export default function Chat({ metaConnections, user }) {
           email: c.email || 'N/A', notes: c.notes || '', agent: c.agent, unpickHistory: c.unpickHistory || []
         }));
       setChats(formattedChats);
-      let newActiveChat = activeChat;
+
       const savedActiveChatId = localStorage.getItem('crm_active_chat_id');
       if (savedActiveChatId && formattedChats.some(c => c.id === savedActiveChatId)) {
-        newActiveChat = savedActiveChatId;
+        setActiveChat(savedActiveChatId);
         localStorage.removeItem('crm_active_chat_id');
-      } else {
-        const exists = formattedChats.some(c => c.id === activeChat);
-        if (!exists) newActiveChat = formattedChats.length > 0 ? formattedChats[0].id : null;
       }
-      setActiveChat(newActiveChat);
+    }).catch(err => console.error('Error fetching messages:', err));
+
+    get('/api/messages').then(data => {
+      if (!data.success) return;
       setAllMessages(data.messages.map(m => {
-        const isAgent = m.senderId === facebookPageId || m.senderId === whatsappPhone || m.senderId === 'my_page' || m.senderId === 'my_whatsapp';
+        const isAgent = m.senderId === metaConnections?.facebookPageId || m.senderId === metaConnections?.whatsappPhone || m.senderId === 'my_page' || m.senderId === 'my_whatsapp';
         return { id: m._id, chatId: isAgent ? m.recipientId : m.senderId, sender: isAgent ? 'agent' : 'client', text: m.text, time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
       }));
     }).catch(err => console.error('Error fetching messages:', err));
-  };
-
-  const facebookPageId = metaConnections?.facebookPageId;
-  const whatsappPhone = metaConnections?.whatsappPhone;
+  }, [user?.name, metaConnections?.facebookPageId, metaConnections?.whatsappPhone]);
 
   useEffect(() => {
     fetchMessages(); fetchLeads();
-    const interval = setInterval(() => { fetchMessages(); fetchLeads(); }, 15000);
-    return () => clearInterval(interval);
-  }, [facebookPageId, whatsappPhone]);
+    let interval = setInterval(() => { fetchMessages(); fetchLeads(); }, 15000);
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(interval);
+      } else {
+        fetchMessages(); fetchLeads();
+        interval = setInterval(() => { fetchMessages(); fetchLeads(); }, 15000);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [fetchMessages, fetchLeads]);
 
   useEffect(() => {
     if (!activeChat || !chats.length) return;
@@ -123,12 +140,12 @@ export default function Chat({ metaConnections, user }) {
     }).catch(err => { console.error('Error unpicking ticket:', err); alert('Could not reach backend server to unpick ticket.'); });
   };
 
-  const messages = allMessages.filter(m => m.chatId === activeChat) || [];
-  const currentChat = chats.find(c => c.id === activeChat) || {
+  const messages = useMemo(() => allMessages.filter(m => m.chatId === activeChat) || [], [allMessages, activeChat]);
+  const currentChat = useMemo(() => chats.find(c => c.id === activeChat) || {
     id: 'placeholder', name: 'No Conversations', platform: 'facebook', lastMsg: '', time: '', unread: 0, phone: '', email: '', notes: '', pictureUrl: ''
-  };
+  }, [chats, activeChat]);
 
-  const matchingLead = leads.find(l => {
+  const matchingLead = useMemo(() => leads.find(l => {
     if (!currentChat || currentChat.id === 'placeholder') return false;
     const normalizePhone = (num) => num ? num.replace(/[^\d]/g, '') : '';
     const lpn = normalizePhone(l.phone), cpn = normalizePhone(currentChat.phone);
@@ -136,7 +153,7 @@ export default function Chat({ metaConnections, user }) {
     const emailMatch = (l.email?.trim().toLowerCase() || '') && (currentChat.email?.trim().toLowerCase() || '') && l.email.trim().toLowerCase() === currentChat.email.trim().toLowerCase();
     const nameMatch = (l.name?.trim().toLowerCase() || '') && (currentChat.name?.trim().toLowerCase() || '') && l.name.trim().toLowerCase() === currentChat.name.trim().toLowerCase();
     return phoneMatch || emailMatch || nameMatch;
-  });
+  }), [leads, currentChat]);
 
   const handleRefresh = () => { fetchMessages(); fetchLeads(); };
 
@@ -151,9 +168,13 @@ export default function Chat({ metaConnections, user }) {
 
       <ConversationDetail currentChat={currentChat} activeChat={activeChat} matchingLead={matchingLead} templates={templates} setTemplates={setTemplates} isAddingTemplate={isAddingTemplate} setIsAddingTemplate={setIsAddingTemplate} handleSelectTemplate={handleSelectTemplate} onRefresh={handleRefresh} onToast={triggerToast} onConvertLead={() => setConvertModalOpen(true)} onUnpickChat={handleUnpickChat} onDeleteChat={handleDeleteChat} />
 
-      <UnpickModal isOpen={unpickModalOpen} onConfirm={confirmUnpickChat} onCancel={() => setUnpickModalOpen(false)} />
+      <Suspense fallback={null}>
+        {unpickModalOpen && <UnpickModal isOpen={unpickModalOpen} onConfirm={confirmUnpickChat} onCancel={() => setUnpickModalOpen(false)} />}
+      </Suspense>
 
-      <ConvertLeadModal isOpen={convertModalOpen} onClose={() => setConvertModalOpen(false)} currentChat={currentChat} matchingLead={matchingLead} onRefresh={handleRefresh} onToast={triggerToast} />
+      <Suspense fallback={null}>
+        {convertModalOpen && <ConvertLeadModal isOpen={convertModalOpen} onClose={() => setConvertModalOpen(false)} currentChat={currentChat} matchingLead={matchingLead} onRefresh={handleRefresh} onToast={triggerToast} />}
+      </Suspense>
 
       {showToast && (
         <div className="fixed bottom-6 right-6 bg-slate-900 border border-indigo-500/30 text-indigo-400 px-4 py-3.5 rounded-xl text-xs font-semibold shadow-2xl shadow-indigo-950/20 flex items-center gap-3 z-50 animate-bounce">

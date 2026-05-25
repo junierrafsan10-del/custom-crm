@@ -1,47 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { put } from '../../utils/api';
-import { Search, Send, Plus, Trash2, Edit2, Clock } from 'lucide-react';
+import { Search, Send, Plus, Trash2, Edit2 } from 'lucide-react';
 
-export default function ConversationDetail({
-  currentChat,
-  activeChat,
-  matchingLead,
-  templates,
-  setTemplates,
-  isAddingTemplate,
-  setIsAddingTemplate,
-  handleSelectTemplate,
-  onRefresh,
-  onToast,
-  onConvertLead,
-  onUnpickChat,
-  onDeleteChat
-}) {
+function ContactInfoPanel({ currentChat, matchingLead, onConvertLead, onUnpickChat, onDeleteChat, onRefresh, onToast }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editNotes, setEditNotes] = useState('');
-  const [rightSidebarTab, setRightSidebarTab] = useState('info');
-  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
-  const [editingTemplateId, setEditingTemplateId] = useState(null);
-  const [templateTitle, setTemplateTitle] = useState('');
-  const [templateText, setTemplateText] = useState('');
-
-  useEffect(() => {
-    setIsEditing(false);
-  }, [activeChat]);
-
-  useEffect(() => {
-    if (isEditing) return;
-    setEditName(currentChat.name || '');
-    setEditPhone(currentChat.phone === 'N/A' ? '' : (currentChat.phone || ''));
-    setEditEmail(currentChat.email === 'N/A' ? '' : (currentChat.email || ''));
-    setEditNotes(currentChat.notes || '');
-  }, [activeChat, currentChat, isEditing]);
+  const [editName, setEditName] = useState(currentChat.name || '');
+  const [editPhone, setEditPhone] = useState(currentChat.phone === 'N/A' ? '' : (currentChat.phone || ''));
+  const [editEmail, setEditEmail] = useState(currentChat.email === 'N/A' ? '' : (currentChat.email || ''));
+  const [editNotes, setEditNotes] = useState(currentChat.notes || '');
 
   const handleSaveContactDetails = () => {
-    if (!activeChat || currentChat.id === 'placeholder') return;
+    if (!currentChat || currentChat.id === 'placeholder') return;
     put('/api/conversations/' + currentChat._id, {
       name: editName,
       phone: editPhone,
@@ -62,6 +31,127 @@ export default function ConversationDetail({
       alert('Could not reach backend server to save contact details.');
     });
   };
+
+  return isEditing ? (
+    <div className="space-y-6">
+      <div className="text-center">
+        {currentChat.pictureUrl ? (
+          <img src={currentChat.pictureUrl} alt={editName} className="w-16 h-16 rounded-full object-cover border border-indigo-500/30 mx-auto" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-indigo-600/15 border border-indigo-500/30 mx-auto flex items-center justify-center font-bold text-lg text-indigo-400">
+            {(editName && editName.charAt(0)) || '?'}
+          </div>
+        )}
+        <h4 className="text-xs font-semibold text-slate-400 mt-3">Edit Profile</h4>
+      </div>
+      <div className="space-y-4">
+        <div>
+          <label className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">Name</label>
+          <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full bg-slate-900/80 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/25" placeholder="Enter name" />
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">Phone</label>
+          <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="w-full bg-slate-900/80 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/25" placeholder="Enter phone number" />
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">Email</label>
+          <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full bg-slate-900/80 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/25" placeholder="Enter email address" />
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">Additional Info</label>
+          <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={4} className="w-full bg-slate-900/80 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/25 resize-none" placeholder="Add additional notes here..." />
+        </div>
+      </div>
+      <div className="flex gap-2 pt-2">
+        <button onClick={handleSaveContactDetails} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition-all shadow-lg shadow-indigo-600/15">Save</button>
+        <button onClick={() => setIsEditing(false)} className="flex-1 py-2 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-slate-400 rounded-lg text-xs font-semibold transition-all">Cancel</button>
+      </div>
+    </div>
+  ) : (
+    <div className="space-y-6 flex flex-col h-full justify-between">
+      <div className="space-y-6">
+        <div className="text-center">
+          {currentChat.pictureUrl ? (
+            <img src={currentChat.pictureUrl} alt={currentChat.name} className="w-16 h-16 rounded-full object-cover border border-slate-800 mx-auto" referrerPolicy="no-referrer" />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-slate-800 mx-auto flex items-center justify-center font-bold text-lg text-slate-300">
+              {(currentChat.name && currentChat.name.charAt(0)) || '?'}
+            </div>
+          )}
+          <h4 className="text-sm font-bold text-slate-200 mt-3">{currentChat.name}</h4>
+          <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded font-medium border border-indigo-500/20 mt-1 inline-block">Prospecting</span>
+        </div>
+
+        <div className="border-t border-slate-800/60 pt-6 space-y-4">
+          <div>
+            <span className="text-[10px] text-slate-500 block uppercase font-semibold">Phone</span>
+            <span className="text-xs text-slate-300 font-medium">{currentChat.phone || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-500 block uppercase font-semibold">Email</span>
+            <span className="text-xs text-slate-300 font-medium">{currentChat.email || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="text-[10px] text-slate-500 block uppercase font-semibold">Integration Source</span>
+            <span className="text-xs text-slate-300 font-medium capitalize">{currentChat.platform}</span>
+          </div>
+          {currentChat.notes && (
+            <div>
+              <span className="text-[10px] text-slate-500 block uppercase font-semibold">Additional Info</span>
+              <p className="text-xs text-slate-400 font-medium leading-relaxed bg-slate-900/30 p-2 rounded border border-slate-800/40 whitespace-pre-line mt-1">{currentChat.notes}</p>
+            </div>
+          )}
+          {currentChat.unpickHistory && currentChat.unpickHistory.length > 0 && (
+            <div className="mt-4">
+              <span className="text-[10px] text-amber-500 block uppercase font-semibold">Unpick History</span>
+              <div className="mt-1.5 bg-slate-900/30 p-2 rounded border border-slate-800/40 space-y-2.5 max-h-36 overflow-y-auto">
+                {currentChat.unpickHistory.map((history, idx) => (
+                  <div key={idx} className="flex flex-col text-[10px] text-slate-400 border-b border-slate-800/20 pb-2 last:border-0 last:pb-0">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-slate-300 truncate max-w-[120px]">{history.agent}</span>
+                      <span className="text-[9px] text-slate-500">{new Date(history.timestamp).toLocaleString()}</span>
+                    </div>
+                    {history.reason && (
+                      <div className="text-[9px] text-slate-500 italic mt-1 pl-2 border-l border-amber-500/40">Reason: {history.reason}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2 border-t border-slate-800/60 pt-6">
+        <button onClick={() => setIsEditing(true)} className="w-full py-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 rounded-lg text-xs font-semibold transition-all mb-1">Edit Details</button>
+        <button onClick={onConvertLead} className="w-full py-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-indigo-400 rounded-lg text-xs font-semibold transition-all">{matchingLead ? 'Update Lead' : 'Convert to Lead'}</button>
+        <button onClick={onUnpickChat} className="w-full py-2 bg-rose-600/10 hover:bg-rose-600/20 border border-rose-500/20 text-rose-400 rounded-lg text-xs font-semibold transition-all">Unpick Ticket</button>
+        <button onClick={onDeleteChat} className="w-full py-2 bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold transition-all">Delete Ticket (Remove)</button>
+      </div>
+    </div>
+  );
+}
+
+export default function ConversationDetail({
+  currentChat,
+  activeChat,
+  matchingLead,
+  templates,
+  setTemplates,
+  isAddingTemplate,
+  setIsAddingTemplate,
+  handleSelectTemplate,
+  onRefresh,
+  onToast,
+  onConvertLead,
+  onUnpickChat,
+  onDeleteChat
+}) {
+  const [rightSidebarTab, setRightSidebarTab] = useState('info');
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+  const [editingTemplateId, setEditingTemplateId] = useState(null);
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [templateText, setTemplateText] = useState('');
 
   const handleSaveTemplate = (e) => {
     e.preventDefault();
@@ -105,104 +195,7 @@ export default function ConversationDetail({
 
         <div className="flex-1 min-h-0 overflow-y-auto">
           {rightSidebarTab === 'info' ? (
-            isEditing ? (
-              <div className="space-y-6">
-                <div className="text-center">
-                  {currentChat.pictureUrl ? (
-                    <img src={currentChat.pictureUrl} alt={editName} className="w-16 h-16 rounded-full object-cover border border-indigo-500/30 mx-auto" referrerPolicy="no-referrer" />
-                  ) : (
-                    <div className="w-16 h-16 rounded-full bg-indigo-600/15 border border-indigo-500/30 mx-auto flex items-center justify-center font-bold text-lg text-indigo-400">
-                      {(editName && editName.charAt(0)) || '?'}
-                    </div>
-                  )}
-                  <h4 className="text-xs font-semibold text-slate-400 mt-3">Edit Profile</h4>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">Name</label>
-                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="w-full bg-slate-900/80 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/25" placeholder="Enter name" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">Phone</label>
-                    <input type="text" value={editPhone} onChange={e => setEditPhone(e.target.value)} className="w-full bg-slate-900/80 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/25" placeholder="Enter phone number" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">Email</label>
-                    <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} className="w-full bg-slate-900/80 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/25" placeholder="Enter email address" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block uppercase font-semibold mb-1">Additional Info</label>
-                    <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={4} className="w-full bg-slate-900/80 border border-slate-800 rounded px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/25 resize-none" placeholder="Add additional notes here..." />
-                  </div>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <button onClick={handleSaveContactDetails} className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition-all shadow-lg shadow-indigo-600/15">Save</button>
-                  <button onClick={() => setIsEditing(false)} className="flex-1 py-2 bg-slate-900 hover:bg-slate-800/80 border border-slate-800 text-slate-400 rounded-lg text-xs font-semibold transition-all">Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6 flex flex-col h-full justify-between">
-                <div className="space-y-6">
-                  <div className="text-center">
-                    {currentChat.pictureUrl ? (
-                      <img src={currentChat.pictureUrl} alt={currentChat.name} className="w-16 h-16 rounded-full object-cover border border-slate-800 mx-auto" referrerPolicy="no-referrer" />
-                    ) : (
-                      <div className="w-16 h-16 rounded-full bg-slate-800 mx-auto flex items-center justify-center font-bold text-lg text-slate-300">
-                        {(currentChat.name && currentChat.name.charAt(0)) || '?'}
-                      </div>
-                    )}
-                    <h4 className="text-sm font-bold text-slate-200 mt-3">{currentChat.name}</h4>
-                    <span className="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded font-medium border border-indigo-500/20 mt-1 inline-block">Prospecting</span>
-                  </div>
-
-                  <div className="border-t border-slate-800/60 pt-6 space-y-4">
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase font-semibold">Phone</span>
-                      <span className="text-xs text-slate-300 font-medium">{currentChat.phone || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase font-semibold">Email</span>
-                      <span className="text-xs text-slate-300 font-medium">{currentChat.email || 'N/A'}</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block uppercase font-semibold">Integration Source</span>
-                      <span className="text-xs text-slate-300 font-medium capitalize">{currentChat.platform}</span>
-                    </div>
-                    {currentChat.notes && (
-                      <div>
-                        <span className="text-[10px] text-slate-500 block uppercase font-semibold">Additional Info</span>
-                        <p className="text-xs text-slate-400 font-medium leading-relaxed bg-slate-900/30 p-2 rounded border border-slate-800/40 whitespace-pre-line mt-1">{currentChat.notes}</p>
-                      </div>
-                    )}
-                    {currentChat.unpickHistory && currentChat.unpickHistory.length > 0 && (
-                      <div className="mt-4">
-                        <span className="text-[10px] text-amber-500 block uppercase font-semibold">Unpick History</span>
-                        <div className="mt-1.5 bg-slate-900/30 p-2 rounded border border-slate-800/40 space-y-2.5 max-h-36 overflow-y-auto">
-                          {currentChat.unpickHistory.map((history, idx) => (
-                            <div key={idx} className="flex flex-col text-[10px] text-slate-400 border-b border-slate-800/20 pb-2 last:border-0 last:pb-0">
-                              <div className="flex justify-between items-center">
-                                <span className="font-semibold text-slate-300 truncate max-w-[120px]">{history.agent}</span>
-                                <span className="text-[9px] text-slate-500">{new Date(history.timestamp).toLocaleString()}</span>
-                              </div>
-                              {history.reason && (
-                                <div className="text-[9px] text-slate-500 italic mt-1 pl-2 border-l border-amber-500/40">Reason: {history.reason}</div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2 border-t border-slate-800/60 pt-6">
-                  <button onClick={() => setIsEditing(true)} className="w-full py-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 rounded-lg text-xs font-semibold transition-all mb-1">Edit Details</button>
-                  <button onClick={onConvertLead} className="w-full py-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-indigo-400 rounded-lg text-xs font-semibold transition-all">{matchingLead ? 'Update Lead' : 'Convert to Lead'}</button>
-                  <button onClick={onUnpickChat} className="w-full py-2 bg-rose-600/10 hover:bg-rose-600/20 border border-rose-500/20 text-rose-400 rounded-lg text-xs font-semibold transition-all">Unpick Ticket</button>
-                  <button onClick={onDeleteChat} className="w-full py-2 bg-red-600/10 hover:bg-red-600/20 border border-red-500/20 text-red-400 rounded-lg text-xs font-semibold transition-all">Delete Ticket (Remove)</button>
-                </div>
-              </div>
-            )
+            <ContactInfoPanel key={activeChat} currentChat={currentChat} matchingLead={matchingLead} onConvertLead={onConvertLead} onUnpickChat={onUnpickChat} onDeleteChat={onDeleteChat} onRefresh={onRefresh} onToast={onToast} />
           ) : (
             <div className="space-y-4 h-full flex flex-col">
               {(isAddingTemplate || editingTemplateId) ? (

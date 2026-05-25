@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { get, post, put, del } from '../utils/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -6,7 +6,6 @@ import {
   Trash2,
   ArrowRight,
   X,
-  Target,
   Inbox
 } from 'lucide-react';
 
@@ -40,7 +39,7 @@ function getInitials(name) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
-function EmptyColumn({ label }) {
+function EmptyColumn() {
   return (
     <div className="flex flex-col items-center justify-center h-40 border border-dashed border-outline-variant/15 rounded-xl bg-surface-container-low/20">
       <Inbox size={24} className="text-on-surface-variant/20 mb-2" />
@@ -52,7 +51,7 @@ function EmptyColumn({ label }) {
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
-  const [search, setSearch] = useState('');
+  const [search] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newLead, setNewLead] = useState({ name: '', email: '', phone: '', stage: 'Intake', source: 'Facebook', value: '' });
 
@@ -223,7 +222,7 @@ export default function Leads() {
                   })}
                 </AnimatePresence>
 
-                {count === 0 && <EmptyColumn label={stageLabels[stage]} />}
+                {count === 0 && <EmptyColumn />}
               </div>
             </div>
           );

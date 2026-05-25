@@ -1,21 +1,14 @@
 const express = require('express');
-const { body, param, validationResult } = require('express-validator');
+const { body, param } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const requireAuth = require('../middleware/auth');
 const requireAdmin = require('../middleware/requireAdmin');
+const { authEvent } = require('../middleware/audit');
+const { USER_ROLES } = require('../src/constants');
+const { handleValidation } = require('../src/utils/validation');
 
 const router = express.Router();
-
-const userRoles = ['Admin', 'Agent'];
-
-const handleValidation = (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, errors: errors.array() });
-  }
-  next();
-};
 
 router.get('/api/users', requireAuth, async (req, res) => {
   try {
@@ -24,74 +17,92 @@ router.get('/api/users', requireAuth, async (req, res) => {
     if (req.query.cursor) {
       filter._id = { $lt: req.query.cursor };
     }
-    const users = await User.find(filter).select('-password').sort({ createdAt: -1 }).limit(limit + 1);
+    const users = await User.find(filter).select('-password -loginAttempts -lockoutUntil -tokenVersion').sort({ createdAt: -1 }).limit(limit + 1);
     const hasMore = users.length > limit;
     const page = hasMore ? users.slice(0, limit) : users;
-    const safe = page.map(u => ({ ...u.toObject(), id: u._id.toString() }));
+    const safe = page.map(u => u.toSafeObject());
     const nextCursor = hasMore ? page[page.length - 1]._id.toString() : null;
     res.json({ success: true, users: safe, nextCursor });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('List users error:', err);
+    res.status(500).json({ success: false, error: 'Failed to list users' });
   }
 });
 
 router.post('/api/users/create', requireAuth, requireAdmin, [
-  body('username').trim().notEmpty().withMessage('username is required'),
-  body('password').notEmpty().withMessage('password is required').isLength({ min: 6 }).withMessage('password must be at least 6 characters'),
-  body('name').optional().trim(),
-  body('role').optional().isIn(userRoles).withMessage(`role must be one of: ${userRoles.join(', ')}`),
-  body('avatar').optional().trim(),
-  body('email').optional().trim(),
-  body('phone').optional().trim(),
+  body('username').trim().notEmpty().withMessage('Username is required')
+    .isLength({ min: 3, max: 30 }).withMessage('Username must be 3-30 characters')
+    .matches(/^[a-zA-Z0-9_]+$/).withMessage('Username can only contain letters, numbers, and underscores'),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('name').optional().trim().isLength({ max: 100 }),
+  body('role').optional().isIn(USER_ROLES).withMessage(`Role must be one of: ${USER_ROLES.join(', ')}`),
+  body('email').optional().trim().isEmail().withMessage('Invalid email'),
+  body('phone').optional().trim().isLength({ max: 30 }),
   handleValidation
 ], async (req, res) => {
   try {
-    const { username, password, name, role, avatar, email, phone } = req.body;
-    const existing = await User.findOne({ username });
+    const { username, password, name, role, email, phone } = req.body;
+    const existing = await User.findOne({ username: username.toLowerCase() });
     if (existing) {
-      return res.status(400).json({ success: false, error: 'Username already exists' });
+      return res.status(409).json({ success: false, error: 'Username already exists' });
     }
-    const hashed = bcrypt.hashSync(password || 'password123', 10);
-    const user = await User.create({ username, password: hashed, name, role, avatar, email, phone });
-    const u = { ...user.toObject(), id: user._id.toString() };
-    delete u.password;
-    res.json({ success: true, data: u });
+    const hashed = bcrypt.hashSync(password, 12);
+    const user = await User.create({
+      username: username.toLowerCase(),
+      password: hashed,
+      name: name || '',
+      role: role || 'Agent',
+      email: email || '',
+      phone: phone || ''
+    });
+    authEvent('user_created', req.user.id, `Created user: ${user.username}`);
+    res.status(201).json({ success: true, data: user.toSafeObject() });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, error: 'Username already exists' });
+    }
+    console.error('Create user error:', err);
+    res.status(500).json({ success: false, error: 'Failed to create user' });
   }
 });
 
 router.put('/api/users/:id', requireAuth, requireAdmin, [
   param('id').isMongoId().withMessage('Invalid user ID'),
-  body('username').optional().trim(),
-  body('password').optional().isLength({ min: 6 }).withMessage('password must be at least 6 characters'),
-  body('name').optional().trim(),
-  body('role').optional().isIn(userRoles).withMessage(`role must be one of: ${userRoles.join(', ')}`),
-  body('avatar').optional().trim(),
-  body('email').optional().trim(),
-  body('phone').optional().trim(),
+  body('username').optional().trim().isLength({ min: 3, max: 30 }).matches(/^[a-zA-Z0-9_]+$/),
+  body('password').optional().isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('name').optional().trim().isLength({ max: 100 }),
+  body('role').optional().isIn(USER_ROLES),
+  body('email').optional().trim().isEmail().withMessage('Invalid email'),
+  body('phone').optional().trim().isLength({ max: 30 }),
   handleValidation
 ], async (req, res) => {
   try {
-    const { username, password, name, role, avatar, email, phone } = req.body;
+    const { username, password, name, role, email, phone } = req.body;
     const userId = req.params.id;
     const update = {};
     if (name !== undefined) update.name = name;
     if (role !== undefined) update.role = role;
-    if (avatar !== undefined) update.avatar = avatar;
     if (email !== undefined) update.email = email;
     if (phone !== undefined) update.phone = phone;
-    if (password) {
-      update.password = bcrypt.hashSync(password, 10);
+    if (username !== undefined) {
+      update.username = username.toLowerCase();
     }
-    const user = await User.findByIdAndUpdate(userId, update, { new: true }).select('-password');
+    if (password) {
+      update.password = bcrypt.hashSync(password, 12);
+      update.tokenVersion = (await User.findById(userId).select('tokenVersion'))?.tokenVersion + 1 || 1;
+    }
+    const user = await User.findByIdAndUpdate(userId, update, { new: true, runValidators: true }).select('-password -loginAttempts -lockoutUntil -tokenVersion');
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
-    const u = { ...user.toObject(), id: user._id.toString() };
-    res.json({ success: true, user: u });
+    authEvent('user_updated', req.user.id, `Updated user: ${userId}`);
+    res.json({ success: true, user: user.toSafeObject() });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, error: 'Username already exists' });
+    }
+    console.error('Update user error:', err);
+    res.status(500).json({ success: false, error: 'Failed to update user' });
   }
 });
 
@@ -101,17 +112,25 @@ router.delete('/api/users/:id', requireAuth, requireAdmin, [
 ], async (req, res) => {
   try {
     const id = req.params.id;
+    if (id === req.user.id) {
+      return res.status(400).json({ success: false, error: 'Cannot delete your own account' });
+    }
     const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
     if (user.role === 'Admin') {
-      return res.status(403).json({ success: false, error: 'Cannot delete an admin user' });
+      const adminCount = await User.countDocuments({ role: 'Admin' });
+      if (adminCount <= 1) {
+        return res.status(403).json({ success: false, error: 'Cannot delete the last admin account' });
+      }
     }
     await User.findByIdAndDelete(id);
+    authEvent('user_deleted', req.user.id, `Deleted user: ${id}`);
     res.json({ success: true, data: { message: 'User deleted' } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Delete user error:', err);
+    res.status(500).json({ success: false, error: 'Failed to delete user' });
   }
 });
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { post, put } from '../../utils/api';
 import { Plus } from 'lucide-react';
 
@@ -8,57 +8,30 @@ const PRODUCTS = [
   'Smart Casual Blazer'
 ];
 
-export default function ConvertLeadModal({ isOpen, onClose, currentChat, matchingLead, onRefresh, onToast }) {
-  const [leadMode, setLeadMode] = useState('create');
-  const [matchingLeadId, setMatchingLeadId] = useState(null);
-  const [leadName, setLeadName] = useState('');
-  const [leadPhone, setLeadPhone] = useState('');
-  const [leadEmail, setLeadEmail] = useState('');
-  const [leadTitle, setLeadTitle] = useState('');
-  const [leadProduct, setLeadProduct] = useState(PRODUCTS[0]);
-  const [leadStage, setLeadStage] = useState('Intake');
-  const [leadValue, setLeadValue] = useState('');
-  const [leadSource, setLeadSource] = useState('Facebook');
-  const [leadFollowups, setLeadFollowups] = useState([]);
+function LeadFormContent({ onClose, currentChat, matchingLead, onRefresh, onToast }) {
+  const initialMode = matchingLead ? 'update' : 'create';
+  const [leadMode] = useState(initialMode);
+  const initialLeadId = matchingLead?._id || matchingLead?.id || null;
+  const [matchingLeadId] = useState(initialLeadId);
+
+  const normalizePhone = (v) => v === 'N/A' ? '' : (v || '');
+  const initialSource = (matchingLead?.source || (currentChat.platform === 'whatsapp' ? 'WhatsApp' : 'Facebook'));
+  let rawVal = matchingLead?.value || '';
+  if (rawVal.startsWith('$')) rawVal = rawVal.substring(1);
+
+  const [leadName, setLeadName] = useState(matchingLead?.name || currentChat?.name || '');
+  const [leadPhone, setLeadPhone] = useState(matchingLead?.phone || normalizePhone(currentChat?.phone));
+  const [leadEmail, setLeadEmail] = useState(matchingLead?.email || normalizePhone(currentChat?.email));
+  const [leadTitle, setLeadTitle] = useState(matchingLead?.title || '');
+  const [leadProduct, setLeadProduct] = useState(matchingLead?.product || PRODUCTS[0]);
+  const [leadStage, setLeadStage] = useState(matchingLead?.stage || 'Intake');
+  const [leadValue, setLeadValue] = useState(rawVal);
+  const [leadSource, setLeadSource] = useState(initialSource);
+  const [leadFollowups, setLeadFollowups] = useState(matchingLead?.followups || []);
   const [hasFollowUp, setHasFollowUp] = useState(false);
   const [newFollowUpTitle, setNewFollowUpTitle] = useState('');
   const [newFollowUpDate, setNewFollowUpDate] = useState('');
   const [newFollowUpAgent, setNewFollowUpAgent] = useState('Majharul_Islam_Sifat');
-
-  useEffect(() => {
-    if (!isOpen) return;
-    if (matchingLead) {
-      setLeadMode('update');
-      setMatchingLeadId(matchingLead._id || matchingLead.id);
-      setLeadName(matchingLead.name || '');
-      setLeadPhone(matchingLead.phone || '');
-      setLeadEmail(matchingLead.email || '');
-      setLeadTitle(matchingLead.title || '');
-      setLeadProduct(matchingLead.product || PRODUCTS[0]);
-      setLeadStage(matchingLead.stage || 'Intake');
-      let rawVal = matchingLead.value || '';
-      if (rawVal.startsWith('$')) rawVal = rawVal.substring(1);
-      setLeadValue(rawVal);
-      setLeadSource(matchingLead.source || (currentChat.platform === 'whatsapp' ? 'WhatsApp' : 'Facebook'));
-      setLeadFollowups(matchingLead.followups || []);
-    } else {
-      setLeadMode('create');
-      setMatchingLeadId(null);
-      setLeadName(currentChat.name || '');
-      setLeadPhone(currentChat.phone === 'N/A' ? '' : (currentChat.phone || ''));
-      setLeadEmail(currentChat.email === 'N/A' ? '' : (currentChat.email || ''));
-      setLeadTitle('');
-      setLeadProduct(PRODUCTS[0]);
-      setLeadStage('Intake');
-      setLeadValue('');
-      setLeadSource(currentChat.platform === 'whatsapp' ? 'WhatsApp' : 'Facebook');
-      setLeadFollowups([]);
-    }
-    setHasFollowUp(false);
-    setNewFollowUpTitle('');
-    setNewFollowUpDate('');
-    setNewFollowUpAgent('Majharul_Islam_Sifat');
-  }, [isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -87,8 +60,6 @@ export default function ConvertLeadModal({ isOpen, onClose, currentChat, matchin
       alert('Could not reach backend to save lead.');
     });
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -218,4 +189,9 @@ export default function ConvertLeadModal({ isOpen, onClose, currentChat, matchin
       </div>
     </div>
   );
+}
+
+export default function ConvertLeadModal({ isOpen, onClose, currentChat, matchingLead, onRefresh, onToast }) {
+  if (!isOpen) return null;
+  return <LeadFormContent key="form" onClose={onClose} currentChat={currentChat} matchingLead={matchingLead} onRefresh={onRefresh} onToast={onToast} />;
 }

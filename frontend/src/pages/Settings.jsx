@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { get, post, del } from '../utils/api';
+import { get, del } from '../utils/api';
 import { 
-  MessageSquare, 
   Phone, 
   Shield, 
   Eye,
@@ -9,40 +8,8 @@ import {
   Save,
   CheckCircle2
 } from 'lucide-react';
-
-const Facebook = (props) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width={props.size || 24} 
-    height={props.size || 24} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={props.className}
-  >
-    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-  </svg>
-);
-
-const WhatsApp = (props) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width={props.size || 24} 
-    height={props.size || 24} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={props.className}
-  >
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-  </svg>
-);
+import FacebookIcon from '../components/icons/FacebookIcon';
+import WhatsAppIcon from '../components/icons/WhatsAppIcon';
 
 export default function Settings({ metaConnections, refreshStatus }) {
   const [showSecret, setShowSecret] = useState(false);
@@ -121,7 +88,7 @@ export default function Settings({ metaConnections, refreshStatus }) {
         <div className="p-6 rounded-xl glass-panel border border-slate-800">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800/80">
             <div className="flex items-center gap-2">
-              <Facebook className="text-blue-500" size={20} />
+              <FacebookIcon className="text-blue-500" size={20} />
               <h2 className="text-base font-bold text-slate-100">Facebook Page Connection</h2>
             </div>
             
@@ -166,7 +133,7 @@ export default function Settings({ metaConnections, refreshStatus }) {
                 onClick={handleMetaConnect}
                 className="flex items-center gap-1.5 px-4 py-2 mt-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-all shadow-lg shadow-blue-600/10"
               >
-                <Facebook size={14} /> Connect Facebook Page
+                <FacebookIcon size={14} /> Connect Facebook Page
               </button>
             </div>
           )}
@@ -176,7 +143,7 @@ export default function Settings({ metaConnections, refreshStatus }) {
         <div className="p-6 rounded-xl glass-panel border border-slate-800">
           <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800/80">
             <div className="flex items-center gap-2">
-              <WhatsApp className="text-emerald-500" size={20} />
+              <WhatsAppIcon className="text-emerald-500" size={20} />
               <h2 className="text-base font-bold text-slate-100">WhatsApp Business Connection</h2>
             </div>
             
@@ -225,7 +192,7 @@ export default function Settings({ metaConnections, refreshStatus }) {
                 onClick={handleMetaConnect}
                 className="flex items-center gap-1.5 px-4 py-2 mt-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-lg transition-all shadow-lg shadow-emerald-600/10"
               >
-                <WhatsApp size={14} /> Connect WhatsApp Business
+                <WhatsAppIcon size={14} /> Connect WhatsApp Business
               </button>
             </div>
           )}

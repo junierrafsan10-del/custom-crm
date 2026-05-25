@@ -1,21 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { get, post, put, del } from '../utils/api';
 import { 
   Users, 
   UserPlus, 
-  Shield, 
-  ShieldCheck, 
   Mail, 
   Phone, 
   Trash2, 
   Edit2, 
-  Lock, 
   X, 
   Check, 
   Copy, 
-  Key, 
-  User, 
-  Globe, 
   Loader2,
   AlertCircle
 } from 'lucide-react';
@@ -57,9 +51,23 @@ export default function Members({ user, setUser }) {
 
   const isAdmin = user?.role === 'Admin';
 
+  useEffect(() => {
+    get('/api/users')
+      .then(data => {
+        if (data.success) {
+          setMembers(data.users);
+        } else {
+          throw new Error(data.error || 'Failed to fetch members.');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        setError(err.message);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   const fetchMembers = async () => {
-    setLoading(true);
-    setError(null);
     try {
       const data = await get('/api/users');
       if (data.success) {
@@ -74,10 +82,6 @@ export default function Members({ user, setUser }) {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchMembers();
-  }, []);
 
   const handleCopy = (text, typeId) => {
     navigator.clipboard.writeText(text);
@@ -157,7 +161,8 @@ export default function Members({ user, setUser }) {
 
     try {
       const memberId = selectedMember.id || selectedMember._id;
-      const { id, ...bodyPayload } = payload;
+      const bodyPayload = { ...payload };
+      delete bodyPayload.id;
       const data = await put('/api/users/' + memberId, bodyPayload);
       if (data.success) {
         setShowEditModal(false);

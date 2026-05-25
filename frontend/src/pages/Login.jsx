@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useState } from 'react';
 import { post } from '../utils/api';
 import { User, Lock, Eye, EyeOff, LogIn, ShieldAlert, Sparkles } from 'lucide-react';
 
@@ -39,12 +38,7 @@ export default function Login({ onLoginSuccess }) {
       <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] rounded-full bg-primary/8 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[35rem] h-[35rem] rounded-full bg-primary/8 blur-[100px] pointer-events-none" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="w-full max-w-[400px] flex flex-col gap-6 z-10"
-      >
+      <div className="w-full max-w-[400px] flex flex-col gap-6 z-10 animate-fade-in">
         {/* Brand */}
         <div className="flex flex-col items-center text-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center border border-primary/10">
@@ -62,14 +56,10 @@ export default function Login({ onLoginSuccess }) {
 
           <form onSubmit={handleSubmit} className="space-y-4.5">
             {error && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="p-3 bg-error/10 border border-error/20 text-error rounded-lg text-xs font-semibold flex items-center gap-2"
-              >
+              <div className="p-3 bg-error/10 border border-error/20 text-error rounded-lg text-xs font-semibold flex items-center gap-2 animate-fade-in">
                 <ShieldAlert size={14} className="flex-shrink-0" />
                 <span>{error}</span>
-              </motion.div>
+              </div>
             )}
 
             <div className="space-y-1.5">
@@ -135,7 +125,7 @@ export default function Login({ onLoginSuccess }) {
         <p className="text-center text-[10px] text-on-surface-variant/30 font-medium">
           Custom CRM &copy; {new Date().getFullYear()}
         </p>
-      </motion.div>
+      </div>
     </div>
   );
 }
