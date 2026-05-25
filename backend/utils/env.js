@@ -38,6 +38,9 @@ function validateEnv() {
   }
 
   const cfg = {};
+  for (const key of REQUIRED_VARS) {
+    cfg[key] = process.env[key];
+  }
   for (const [key, opts] of Object.entries(OPTIONAL_VARS)) {
     const val = process.env[key] !== undefined ? process.env[key] : opts.default;
     cfg[key] = opts.parse ? opts.parse(val) : val;
